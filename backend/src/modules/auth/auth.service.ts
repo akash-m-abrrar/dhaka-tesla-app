@@ -2,9 +2,9 @@ import type { User } from "../../generated/prisma/client.js";
 import { Prisma, UserRole, UserStatus } from "../../generated/prisma/client.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { ERROR_CODES } from "../../common/errors/errorCodes.js";
-import { hashPassword } from "../../common/utils/password.js";
+import { comparePassword, hashPassword } from "../../common/utils/password.js";
 import { prisma } from "../../config/database.js";
-import type { RegisterInput } from "./auth.validation.js";
+import type { LoginInput, RegisterInput } from "./auth.validation.js";
 
 export interface SafeUser {
     id: string;
@@ -86,5 +86,32 @@ export const authService = {
 
             throw error;
         }
+    },
+
+    async login(input: LoginInput): Promise<SafeUser> {
+        const normalizedEmail = input.email.trim().toLowerCase();
+
+        // 1. Look up user by normalized email
+        const user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+        });
+
+        // 2. Generic credential failure — do not reveal whether account exists
+        if (!user) {
+            throw new AppError("Invalid email or password", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        // 3. Verify password using constant-time comparison
+        const passwordMatch = await comparePassword(input.password, user.passwordHash);
+        if (!passwordMatch) {
+            throw new AppError("Invalid email or password", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        // 4. Check account status only after credentials are confirmed
+        if (user.status !== UserStatus.ACTIVE) {
+            throw new AppError("Account is inactive", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        return sanitizeUser(user);
     },
 };
