@@ -1,0 +1,29 @@
+enum UserRole {
+  PASSENGER
+  DRIVER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  name         String     @db.VarChar(100)
+  email        String     @unique @db.VarChar(100)
+  phone        String?    @unique @db.VarChar(20)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  role         UserRole   @default(PASSENGER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  driverApplication DriverApplication?
+  vehicles          Vehicle[]          @relation("UserVehicles")
+  pools             Pool[]             @relation("DriverPools")
+  rideRequests      RideRequest[]      @relation("PassengerRideRequests")
+  poolMembers       PoolMember[]       @relation("PassengerPoolMembers")
+
+  @@map("users")
+}

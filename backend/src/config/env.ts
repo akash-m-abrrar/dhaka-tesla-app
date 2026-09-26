@@ -9,6 +9,8 @@ const envSchema = z.object({
     PORT: z.coerce.number().int().positive().default(5000),
 
     HOST: z.string().default("0.0.0.0"),
+
+    DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 });
 
 export const env = envSchema.parse(process.env);

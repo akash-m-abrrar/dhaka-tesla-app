@@ -1,0 +1,28 @@
+enum RideRequestStatus {
+  PENDING
+  MATCHED
+  ACCEPTED
+  CANCELLED
+}
+
+model RideRequest {
+  id                String            @id @default(uuid()) @db.Uuid
+  passengerId       String            @map("passenger_id") @db.Uuid
+  pickupZoneId      String            @map("pickup_zone_id") @db.Uuid
+  destinationZoneId String            @map("destination_zone_id") @db.Uuid
+  requestedSeats    Int               @map("requested_seats")
+  estimatedFare     Int               @map("estimated_fare")
+  status            RideRequestStatus @default(PENDING)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  passenger       User        @relation("PassengerRideRequests", fields: [passengerId], references: [id])
+  pickupZone      Zone        @relation("PickupZone", fields: [pickupZoneId], references: [id])
+  destinationZone Zone        @relation("DestinationZone", fields: [destinationZoneId], references: [id])
+  poolMember      PoolMember?
+
+  @@index([passengerId])
+  @@index([pickupZoneId])
+  @@index([destinationZoneId])
+  @@map("ride_requests")
+}

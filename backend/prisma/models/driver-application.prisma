@@ -1,0 +1,21 @@
+enum DriverApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DriverApplication {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  userId             String                  @unique @map("user_id") @db.Uuid
+  licenseNumber      String                  @map("license_number") @db.VarChar(50)
+  vehicleModel       String                  @map("vehicle_model") @db.VarChar(50)
+  vehiclePlateNumber String                  @map("vehicle_plate_number") @db.VarChar(20)
+  status             DriverApplicationStatus @default(PENDING)
+  submittedAt        DateTime                @default(now()) @map("submitted_at")
+  reviewedAt         DateTime?               @map("reviewed_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("driver_applications")
+}
