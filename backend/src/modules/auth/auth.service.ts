@@ -3,6 +3,7 @@ import { Prisma, UserRole, UserStatus } from "../../generated/prisma/client.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { ERROR_CODES } from "../../common/errors/errorCodes.js";
 import { comparePassword, hashPassword } from "../../common/utils/password.js";
+import { signAccessToken, signRefreshToken } from "../../common/utils/jwt.js";
 import { prisma } from "../../config/database.js";
 import type { LoginInput, RegisterInput } from "./auth.validation.js";
 
@@ -15,6 +16,12 @@ export interface SafeUser {
     status: UserStatus;
     createdAt: Date;
     updatedAt: Date;
+}
+
+export interface LoginResult {
+    user: SafeUser;
+    accessToken: string;
+    refreshToken: string;
 }
 
 export function sanitizeUser(user: User): SafeUser {
@@ -88,7 +95,7 @@ export const authService = {
         }
     },
 
-    async login(input: LoginInput): Promise<SafeUser> {
+    async login(input: LoginInput): Promise<LoginResult> {
         const normalizedEmail = input.email.trim().toLowerCase();
 
         // 1. Look up user by normalized email
@@ -112,6 +119,13 @@ export const authService = {
             throw new AppError("Account is inactive", 401, ERROR_CODES.UNAUTHORIZED);
         }
 
-        return sanitizeUser(user);
+        const accessToken = await signAccessToken({ sub: user.id, role: user.role });
+        const refreshToken = await signRefreshToken({ sub: user.id });
+
+        return {
+            user: sanitizeUser(user),
+            accessToken,
+            refreshToken,
+        };
     },
 };

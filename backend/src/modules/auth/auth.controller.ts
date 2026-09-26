@@ -41,14 +41,12 @@ export const authController = {
                 throw new AppError(errorMessage, 400, ERROR_CODES.VALIDATION_ERROR);
             }
 
-            const user = await authService.login(parseResult.data);
+            const loginResult = await authService.login(parseResult.data);
 
             res.status(200).json({
                 success: true,
                 message: "Login successful",
-                data: {
-                    user,
-                },
+                data: loginResult,
             });
         } catch (error) {
             next(error);
