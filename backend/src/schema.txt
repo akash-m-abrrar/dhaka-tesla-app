@@ -1,0 +1,930 @@
+You are working on the backend database foundation of the Tesla-Bullet App.
+
+The project is a ride-sharing / ride-pooling application.
+
+IMPORTANT:
+The attached image is the FINAL ERD and is the source of truth.
+
+Your task is to implement the complete Prisma database schema based ONLY on the ERD and the specifications below.
+
+DO NOT invent additional entities, fields, relationships, or business rules.
+DO NOT add rating, location, review, notification, or any other table that is not present in the ERD.
+DO NOT rename the domain entities unless absolutely required by Prisma naming conventions.
+Preserve the database design represented by the ERD.
+
+--------------------------------------------------
+PROJECT STRUCTURE
+--------------------------------------------------
+
+The Prisma structure should be:
+
+prisma/
+├── schema.prisma
+└── models/
+    ├── user.prisma
+    ├── driver-application.prisma
+    ├── vehicle.prisma
+    ├── zone.prisma
+    ├── pool.prisma
+    ├── ride-request.prisma
+    ├── pool-member.prisma
+    ├── ride-history.prisma
+    └── payment.prisma
+
+There are exactly 9 domain models.
+
+schema.prisma is the Prisma entry point and should import/include the model definitions according to the project's Prisma version/setup.
+
+--------------------------------------------------
+DATABASE MODELS
+--------------------------------------------------
+
+1. USER
+File:
+models/user.prisma
+
+Database table:
+users
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+name
+- VARCHAR(100)
+
+email
+- VARCHAR(100)
+- UNIQUE
+
+phone
+- VARCHAR(20)
+- UNIQUE
+
+password_hash
+- VARCHAR(255)
+
+role
+- ENUM('PASSENGER', 'DRIVER')
+
+status
+- ENUM('ACTIVE', 'INACTIVE')
+
+created_at
+- TIMESTAMP
+
+updated_at
+- TIMESTAMP
+
+Prisma naming may use camelCase while mapping to the database column names with @map.
+
+Expected Prisma-style fields may therefore be:
+
+id
+name
+email
+phone
+passwordHash
+role
+status
+createdAt
+updatedAt
+
+Use @map("password_hash"), @map("created_at"), etc. where appropriate.
+
+--------------------------------------------------
+2. DRIVER APPLICATION
+--------------------------------------------------
+
+File:
+models/driver-application.prisma
+
+Database table:
+driver_applications
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+user_id
+- UUID
+- Foreign Key -> users.id
+
+license_number
+- VARCHAR(50)
+
+vehicle_model
+- VARCHAR(50)
+
+vehicle_plate_number
+- VARCHAR(20)
+
+status
+- ENUM('PENDING', 'APPROVED', 'REJECTED')
+
+submitted_at
+- TIMESTAMP
+
+reviewed_at
+- TIMESTAMP
+
+Relationships:
+
+users 1 ---- 0..1 driver_application
+
+A user can have zero or one driver application.
+
+driver_application belongs to exactly one user.
+
+Therefore:
+
+User:
+driverApplication DriverApplication?
+
+DriverApplication:
+user User
+userId UUID
+
+Because this is a one-to-zero-or-one relationship, user_id should be UNIQUE.
+
+--------------------------------------------------
+3. VEHICLE
+--------------------------------------------------
+
+File:
+models/vehicle.prisma
+
+Database table:
+vehicles
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+owner_id
+- UUID
+- Foreign Key -> users.id
+
+model
+- VARCHAR(50)
+
+capacity
+- INT
+- Example: 3
+
+plate_number
+- VARCHAR(20)
+- UNIQUE
+
+status
+- ENUM('ONLINE', 'OFFLINE')
+
+created_at
+- TIMESTAMP
+
+updated_at
+- TIMESTAMP
+
+Relationships:
+
+User 1 ---- N Vehicles
+
+A vehicle belongs to one user.
+
+A user can own multiple vehicles.
+
+Use owner_id as the foreign key.
+
+--------------------------------------------------
+4. ZONE
+--------------------------------------------------
+
+File:
+models/zone.prisma
+
+Database table:
+zones
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+name
+- VARCHAR(50)
+- UNIQUE
+
+type
+- ENUM('AREA', 'POINT')
+
+latitude
+- DECIMAL(9,6)
+
+longitude
+- DECIMAL(9,6)
+
+created_at
+- TIMESTAMP
+
+updated_at
+- TIMESTAMP
+
+--------------------------------------------------
+5. POOL
+--------------------------------------------------
+
+File:
+models/pool.prisma
+
+Database table:
+pools
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+vehicle_id
+- UUID
+- Foreign Key -> vehicles.id
+
+driver_id
+- UUID
+- Foreign Key -> users.id
+
+status
+- ENUM(
+    'REQUESTED',
+    'MATCHED',
+    'DRIVER_ARRIVED',
+    'STARTED',
+    'COMPLETED',
+    'CANCELLED'
+  )
+
+started_at
+- TIMESTAMP
+
+completed_at
+- TIMESTAMP
+
+estimated_fare
+- INT
+- Amount stored in paisa
+
+actual_fare
+- INT
+- Amount stored in paisa
+
+created_at
+- TIMESTAMP
+
+updated_at
+- TIMESTAMP
+
+Relationships:
+
+Vehicle 1 ---- N Pools
+
+A pool uses one vehicle.
+
+User 1 ---- N Pools
+
+The driver is represented by driver_id -> users.id.
+
+--------------------------------------------------
+6. RIDE REQUEST
+--------------------------------------------------
+
+File:
+models/ride-request.prisma
+
+Database table:
+ride_requests
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+passenger_id
+- UUID
+- Foreign Key -> users.id
+
+pickup_zone_id
+- UUID
+- Foreign Key -> zones.id
+
+destination_zone_id
+- UUID
+- Foreign Key -> zones.id
+
+requested_seats
+- INT
+
+estimated_fare
+- INT
+- Amount stored in paisa
+
+status
+- ENUM(
+    'PENDING',
+    'MATCHED',
+    'ACCEPTED',
+    'CANCELLED'
+  )
+
+created_at
+- TIMESTAMP
+
+updated_at
+- TIMESTAMP
+
+Relationships:
+
+User 1 ---- N RideRequests
+
+A passenger creates many ride requests.
+
+Zone 1 ---- N RideRequests through pickup_zone_id.
+
+Zone 1 ---- N RideRequests through destination_zone_id.
+
+A ride request may optionally be matched to a pool member.
+
+Therefore:
+
+RideRequest 1 ---- 0..1 PoolMember
+
+This optional relationship is represented by:
+
+pool_members.ride_request_id -> ride_requests.id
+
+--------------------------------------------------
+7. POOL MEMBER
+--------------------------------------------------
+
+File:
+models/pool-member.prisma
+
+Database table:
+pool_members
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+pool_id
+- UUID
+- Foreign Key -> pools.id
+
+ride_request_id
+- UUID
+- Foreign Key -> ride_requests.id
+
+passenger_id
+- UUID
+- Foreign Key -> users.id
+
+seat_number
+- INT
+
+fare
+- INT
+- Amount stored in paisa
+
+status
+- ENUM(
+    'PENDING',
+    'PAID',
+    'CANCELLED'
+  )
+
+joined_at
+- TIMESTAMP
+
+left_at
+- TIMESTAMP
+- Nullable
+
+Relationships:
+
+Pool 1 ---- N PoolMembers
+
+RideRequest 1 ---- 0..1 PoolMember
+
+User 1 ---- N PoolMembers
+
+A pool member belongs to one pool.
+
+A pool member is associated with one passenger.
+
+A pool member is associated with a ride request.
+
+ride_request_id must be UNIQUE if enforcing the ERD's 0..1 relationship from ride_request to pool_member.
+
+--------------------------------------------------
+8. RIDE HISTORY
+--------------------------------------------------
+
+File:
+models/ride-history.prisma
+
+Database table:
+ride_history
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+pool_id
+- UUID
+- Foreign Key -> pools.id
+
+event_type
+- ENUM(
+    'REQUESTED',
+    'MATCHED',
+    'DRIVER_ARRIVED',
+    'STARTED',
+    'COMPLETED',
+    'CANCELLED'
+  )
+
+note
+- TEXT
+- Nullable
+
+created_at
+- TIMESTAMP
+
+Relationships:
+
+Pool 1 ---- N RideHistory
+
+A pool can have many history events.
+
+--------------------------------------------------
+9. PAYMENT
+--------------------------------------------------
+
+File:
+models/payment.prisma
+
+Database table:
+payments
+
+Fields:
+
+id
+- UUID
+- Primary Key
+
+pool_member_id
+- UUID
+- Foreign Key -> pool_members.id
+
+amount
+- INT
+- Amount stored in paisa
+
+method
+- ENUM('CASH', 'TESLAPAY')
+
+status
+- ENUM('PENDING', 'SUCCESS', 'FAILED')
+
+transaction_ref
+- VARCHAR(100)
+
+paid_at
+- TIMESTAMP
+- Nullable
+
+created_at
+- TIMESTAMP
+
+Relationships:
+
+PoolMember 1 ---- N Payments
+
+A pool member can have payment records.
+
+--------------------------------------------------
+RELATIONSHIP SUMMARY
+--------------------------------------------------
+
+Implement the following relationships exactly:
+
+1. User 1 ---- 0..1 DriverApplication
+
+2. User 1 ---- N Vehicles
+
+3. Vehicle 1 ---- N Pools
+
+4. User 1 ---- N Pools
+   - through Pool.driver_id
+
+5. User 1 ---- N RideRequests
+   - through RideRequest.passenger_id
+
+6. Zone 1 ---- N RideRequests
+   - through RideRequest.pickup_zone_id
+
+7. Zone 1 ---- N RideRequests
+   - through RideRequest.destination_zone_id
+
+8. Pool 1 ---- N PoolMembers
+
+9. RideRequest 1 ---- 0..1 PoolMember
+
+10. User 1 ---- N PoolMembers
+    - through PoolMember.passenger_id
+
+11. Pool 1 ---- N RideHistory
+
+12. PoolMember 1 ---- N Payments
+
+--------------------------------------------------
+IMPORTANT PRISMA RELATION REQUIREMENT
+--------------------------------------------------
+
+Because several models have multiple relationships to the same model,
+use explicit Prisma relation names where necessary.
+
+For example:
+
+RideRequest has TWO relationships with Zone:
+
+pickupZone
+destinationZone
+
+Therefore these must use different relation names, such as:
+
+@relation("PickupZone")
+@relation("DestinationZone")
+
+Likewise, User has multiple relationships with other models:
+
+User -> DriverApplication
+User -> Vehicles
+User -> Pools as driver
+User -> RideRequests as passenger
+User -> PoolMembers as passenger
+
+Give these relations clear explicit names where Prisma requires disambiguation.
+
+DO NOT create ambiguous relations.
+
+--------------------------------------------------
+FOREIGN KEY REQUIREMENTS
+--------------------------------------------------
+
+Use proper Prisma relations with:
+
+@relation(
+  fields: [...],
+  references: [id]
+)
+
+Foreign keys:
+
+DriverApplication.userId -> User.id
+
+Vehicle.ownerId -> User.id
+
+Pool.vehicleId -> Vehicle.id
+
+Pool.driverId -> User.id
+
+RideRequest.passengerId -> User.id
+
+RideRequest.pickupZoneId -> Zone.id
+
+RideRequest.destinationZoneId -> Zone.id
+
+PoolMember.poolId -> Pool.id
+
+PoolMember.rideRequestId -> RideRequest.id
+
+PoolMember.passengerId -> User.id
+
+RideHistory.poolId -> Pool.id
+
+Payment.poolMemberId -> PoolMember.id
+
+--------------------------------------------------
+DATABASE NAMING
+--------------------------------------------------
+
+Use Prisma camelCase field names but preserve the ERD's database naming convention.
+
+Example:
+
+Prisma:
+passwordHash String @map("password_hash")
+
+Prisma:
+createdAt DateTime @map("created_at")
+
+Prisma:
+driverApplication DriverApplication?
+
+Database:
+driver_applications
+
+Use @@map("table_name") for models where the database table name is snake_case.
+
+Example:
+
+model User {
+  ...
+  @@map("users")
+}
+
+--------------------------------------------------
+UUID
+--------------------------------------------------
+
+All primary keys are UUIDs.
+
+Use the project's appropriate Prisma UUID strategy, for example:
+
+id String @id @default(uuid()) @db.Uuid
+
+Use @db.Uuid for UUID foreign keys if the selected database provider supports it.
+
+--------------------------------------------------
+MONEY
+--------------------------------------------------
+
+All money/fare/amount fields are stored as INTEGER PAISA.
+
+Do NOT use Float or Decimal for fare/payment amounts.
+
+The following are integer paisa values:
+
+Pool.estimatedFare
+Pool.actualFare
+RideRequest.estimatedFare
+PoolMember.fare
+Payment.amount
+
+--------------------------------------------------
+TIMESTAMPS
+--------------------------------------------------
+
+Use DateTime for timestamp fields.
+
+created_at / createdAt should normally default to now().
+
+updated_at / updatedAt should normally use @updatedAt where appropriate.
+
+Nullable timestamps such as:
+
+DriverApplication.reviewedAt
+Pool.completedAt
+PoolMember.leftAt
+Payment.paidAt
+
+must be nullable.
+
+--------------------------------------------------
+ENUMS
+--------------------------------------------------
+
+Create Prisma enums corresponding exactly to the ERD:
+
+UserRole:
+PASSENGER
+DRIVER
+
+UserStatus:
+ACTIVE
+INACTIVE
+
+DriverApplicationStatus:
+PENDING
+APPROVED
+REJECTED
+
+VehicleStatus:
+ONLINE
+OFFLINE
+
+PoolStatus:
+REQUESTED
+MATCHED
+DRIVER_ARRIVED
+STARTED
+COMPLETED
+CANCELLED
+
+RideRequestStatus:
+PENDING
+MATCHED
+ACCEPTED
+CANCELLED
+
+PoolMemberStatus:
+PENDING
+PAID
+CANCELLED
+
+RideHistoryEventType:
+REQUESTED
+MATCHED
+DRIVER_ARRIVED
+STARTED
+COMPLETED
+CANCELLED
+
+PaymentMethod:
+CASH
+TESLAPAY
+
+PaymentStatus:
+PENDING
+SUCCESS
+FAILED
+
+ZoneType:
+AREA
+POINT
+
+--------------------------------------------------
+IMPORTANT DESIGN CONSTRAINTS
+--------------------------------------------------
+
+Do NOT add:
+
+- Rating
+- Review
+- Location table
+- Notification table
+- Admin table
+- Wallet table
+- Driver table
+- Passenger table
+- Authentication table
+- Separate Fare table
+- Any other entity not shown in the ERD
+
+The User table represents both passengers and drivers through the role field.
+
+Driver is NOT a separate table.
+
+Passenger is NOT a separate table.
+
+--------------------------------------------------
+INDEXES AND CONSTRAINTS
+--------------------------------------------------
+
+Preserve the explicit UNIQUE constraints from the ERD:
+
+User.email UNIQUE
+User.phone UNIQUE
+Vehicle.plateNumber UNIQUE
+Zone.name UNIQUE
+
+Also enforce one-to-one relationships where the ERD specifies 0..1:
+
+DriverApplication.userId UNIQUE
+PoolMember.rideRequestId UNIQUE
+
+Add sensible indexes on foreign-key columns when appropriate, especially:
+
+DriverApplication.userId
+Vehicle.ownerId
+Pool.vehicleId
+Pool.driverId
+RideRequest.passengerId
+RideRequest.pickupZoneId
+RideRequest.destinationZoneId
+PoolMember.poolId
+PoolMember.rideRequestId
+PoolMember.passengerId
+RideHistory.poolId
+Payment.poolMemberId
+
+Do not add unnecessary indexes blindly.
+
+--------------------------------------------------
+RELATIONSHIP AMBIGUITIES / ERD VALIDATION
+--------------------------------------------------
+
+Before writing code, inspect the ERD and compare every relationship with the actual foreign-key fields.
+
+There appear to be conceptual relationships in the visual ERD that may not have a corresponding foreign-key column.
+
+IMPORTANT:
+Do NOT invent a foreign-key field just to make a visual relationship possible.
+
+If the ERD shows a relationship that cannot be represented by the listed columns, report that discrepancy before implementation.
+
+In particular, verify:
+
+1. The visual "users owns zones" relationship:
+   The zones table shown in the ERD does NOT contain a user_id/owner_id column.
+
+2. The driver application -> vehicle "approves" relationship:
+   The vehicles table shown in the ERD contains owner_id but does not contain driver_application_id/application_id.
+
+Do not silently invent these columns.
+
+If these relationships are conceptual business-flow relationships rather than database FK relationships, leave them out of Prisma relations and mention them in the implementation notes.
+
+--------------------------------------------------
+IMPLEMENTATION PROCESS
+--------------------------------------------------
+
+Follow this order:
+
+STEP 1:
+Inspect the existing repository structure.
+
+STEP 2:
+Inspect:
+prisma/schema.prisma
+and all existing files under:
+prisma/models/
+
+STEP 3:
+Do NOT delete or overwrite existing work blindly.
+
+STEP 4:
+Create or update the 9 model files.
+
+STEP 5:
+Create/update the Prisma enums.
+
+STEP 6:
+Create all required relationships and explicit relation names.
+
+STEP 7:
+Add required @map and @@map mappings.
+
+STEP 8:
+Run:
+
+npx prisma format
+
+STEP 9:
+Run:
+
+npx prisma validate
+
+STEP 10:
+If validation fails, FIX the actual relation/schema problem instead of suppressing or bypassing the error.
+
+STEP 11:
+Do not create migrations yet unless explicitly requested.
+
+STEP 12:
+Do not modify application/business logic outside the Prisma database foundation.
+
+--------------------------------------------------
+EXPECTED FINAL RESULT
+--------------------------------------------------
+
+At the end, provide:
+
+1. List of files created/modified.
+
+2. Complete list of Prisma models.
+
+3. Complete list of enums.
+
+4. Complete list of relationships.
+
+5. Any ERD inconsistencies discovered.
+
+6. Output of:
+
+npx prisma format
+
+7. Output/result of:
+
+npx prisma validate
+
+The final Prisma schema must validate successfully.
+
+Most importantly:
+
+DO NOT GUESS.
+DO NOT ADD EXTRA TABLES.
+DO NOT ADD EXTRA FIELDS.
+DO NOT CHANGE THE ERD DESIGN WITHOUT EXPLAINING WHY.

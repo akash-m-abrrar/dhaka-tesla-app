@@ -1,0 +1,227 @@
+You are working on the Tesla Bullet App backend.
+
+## Current Context
+
+Project stack:
+
+* Node.js
+* TypeScript
+* Express
+* PostgreSQL
+* Prisma 7.10.0
+* ESM
+* `tsx`
+* pnpm
+
+Current branch:
+
+```text
+feature/database-seeding
+```
+
+The Prisma seed command has already been configured in:
+
+```text
+prisma7.config.ts
+```
+
+as:
+
+```ts
+seed: "tsx prisma/seed.ts",
+```
+
+The Prisma schema is split across:
+
+```text
+prisma/models/
+```
+
+There are 9 models:
+
+```text
+User
+DriverApplication
+Vehicle
+Zone
+Pool
+RideRequest
+PoolMember
+RideHistory
+Payment
+```
+
+## Task
+
+Create the database seed file:
+
+```text
+prisma/seed.ts
+```
+
+The seed should populate **only baseline Zone data**.
+
+Do NOT seed:
+
+* Users
+* Driver applications
+* Vehicles
+* Pools
+* Ride requests
+* Pool members
+* Ride history
+* Payments
+
+Those belong to later application phases and should not be coupled into the Phase 1 seed.
+
+## Zone Seed Requirements
+
+Use a small, sensible set of development zones for the Dhaka Tesla pooling application.
+
+Each zone must satisfy the existing Prisma model:
+
+```prisma
+model Zone {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(50)
+  type      ZoneType
+  latitude  Decimal  @db.Decimal(9, 6)
+  longitude Decimal  @db.Decimal(9, 6)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+}
+```
+
+Use the existing `ZoneType` enum:
+
+```text
+AREA
+POINT
+```
+
+Choose a small number of useful development zones rather than creating a large dataset.
+
+## Seed Design
+
+The seed must be:
+
+* idempotent
+* deterministic
+* simple
+* readable
+* safe to run repeatedly
+* free of destructive deletes
+* free of unnecessary dependencies
+* consistent with the project's existing TypeScript/ESM style
+
+Use `upsert` based on the unique `name` field so repeated runs update the existing zone rather than creating duplicates.
+
+Do not use:
+
+* `deleteMany`
+* database resets
+* random data
+* generated fake data
+* hardcoded UUIDs unless there is a genuine reason
+* unnecessary seed frameworks
+
+## Database Access
+
+Reuse the project's existing Prisma database configuration if appropriate rather than creating a second database connection architecture.
+
+The existing database module is:
+
+```text
+src/config/database.ts
+```
+
+Follow the project's existing Prisma 7 PostgreSQL adapter setup.
+
+Make sure the seed properly finishes and disconnects from Prisma after execution.
+
+Use proper error handling so a failed seed exits with a non-zero status.
+
+## Decimal Handling
+
+Because `latitude` and `longitude` are Prisma `Decimal` fields, use a type-safe approach compatible with the existing generated Prisma client.
+
+Do not weaken TypeScript types with `any`.
+
+## Scope Restrictions
+
+Modify/create only what is necessary for this task:
+
+```text
+prisma/seed.ts
+```
+
+Do not modify:
+
+* Prisma models
+* migration files
+* `schema.prisma`
+* `prisma7.config.ts`
+* `package.json`
+* application routes
+* authentication code
+* unrelated files
+
+Do not touch:
+
+```text
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+src/db-verify.txt
+src/schema.txt
+```
+
+## Verification
+
+After implementation, run:
+
+```bash
+pnpm exec prisma validate
+```
+
+Then execute the seed:
+
+```bash
+pnpm exec prisma db seed
+```
+
+Run the seed command a second time to verify idempotency:
+
+```bash
+pnpm exec prisma db seed
+```
+
+The second execution must not create duplicate zones or fail because the records already exist.
+
+Then run:
+
+```bash
+pnpm run typecheck
+```
+
+Finally inspect:
+
+```bash
+git diff -- prisma/seed.ts
+git status
+```
+
+Do NOT commit anything.
+
+## Final Report
+
+Report:
+
+1. What was implemented.
+2. Which zones were seeded.
+3. Whether the first seed execution succeeded.
+4. Whether the second execution proved idempotency.
+5. Validation result.
+6. Typecheck result.
+7. Exact files created or modified.

@@ -1,0 +1,299 @@
+We are now moving into **Phase 3 — Core API** of the Tesla Bullet backend.
+
+Phase 2 — Auth & Users — is complete and verified.
+
+The existing authentication foundation includes:
+
+* Register
+* Login
+* Password hashing
+* Access token
+* Refresh token
+* authMiddleware
+* req.user typing
+* GET /auth/me
+* requireRole()
+* assertOwnership()
+* Driver application
+* Driver auto-approval
+* User role promotion to DRIVER
+
+Do not refactor or reopen Phase 2 unless something is genuinely required.
+
+## Current goal
+
+Implement the first small Core API foundation:
+
+# Zone + Vehicle
+
+These resources are prerequisites for passenger ride requests and driver/pool functionality.
+
+The existing Prisma schema already contains `Zone` and `Vehicle`. Inspect the actual schema before coding and use the existing fields/relations exactly as defined.
+
+---
+
+# PART A — Zone API
+
+Zones represent the predefined Dhaka pickup/destination areas used by the MVP.
+
+The challenge explicitly says we should keep geography simple and use predefined Dhaka areas.
+
+Do NOT integrate Google Maps, Mapbox, routing APIs, geocoding APIs, or external geographic services.
+
+### Required endpoints
+
+Implement:
+
+```http
+GET /api/v1/zones
+GET /api/v1/zones/:id
+```
+
+Use the existing project route/module structure.
+
+### GET /zones
+
+Return available predefined zones.
+
+Use the existing standard response structure.
+
+### GET /zones/:id
+
+Return one zone by ID.
+
+If the zone does not exist, use the project's existing error conventions.
+
+### Rules
+
+* Zones are readable without authentication unless the existing architecture strongly suggests otherwise.
+* Do not add zone creation/update/delete endpoints yet.
+* Do not allow arbitrary user-created zones.
+* Do not modify the Prisma schema.
+* Do not add external map services.
+
+---
+
+# PART B — Vehicle API
+
+Vehicles represent the driver's Tesla/Bullet.
+
+The vehicle belongs to a driver.
+
+Inspect the actual `Vehicle` Prisma model and use its real fields and relations.
+
+### Required endpoint
+
+Implement the minimum driver vehicle creation/read flow needed for the MVP.
+
+At minimum:
+
+```http
+POST /api/v1/vehicles
+GET /api/v1/vehicles
+GET /api/v1/vehicles/:id
+```
+
+Use existing authentication and authorization middleware.
+
+Expected route protection:
+
+```text
+POST /vehicles
+    ↓
+authMiddleware
+    ↓
+requireRole(DRIVER)
+    ↓
+controller
+```
+
+The authenticated driver's ID must come from:
+
+```ts
+req.user.id
+```
+
+Never trust a client-supplied driver/user ID.
+
+---
+
+# Vehicle ownership
+
+A driver must only be able to access their own vehicle data where the endpoint represents their personal vehicle resource.
+
+Use the existing:
+
+```ts
+assertOwnership()
+```
+
+helper where appropriate.
+
+Do not create another ownership utility.
+
+A passenger must not be able to create or modify a driver's vehicle.
+
+---
+
+# Vehicle capacity
+
+The challenge says Bullet has a fixed capacity and the system must never exceed capacity later in the pooling flow.
+
+Inspect the current schema and preserve the existing capacity representation.
+
+Do not create dynamic capacity logic yet.
+
+For this task, simply ensure the vehicle stores the fixed capacity required by the existing model/business rule.
+
+Do not allow arbitrary passenger-controlled capacity values.
+
+If the existing application design requires the capacity to be assigned server-side, do that.
+
+Document the assumption if necessary.
+
+---
+
+# Validation
+
+Use the project's existing Zod validation conventions.
+
+Inspect existing validation schemas first.
+
+Validate only fields actually present in the current Prisma `Vehicle` model and required by the MVP.
+
+Do not duplicate Prisma enums or types manually.
+
+---
+
+# Business rules
+
+At minimum enforce:
+
+1. Only authenticated DRIVER users can create a vehicle.
+2. A vehicle must have an owner/driver according to the existing schema.
+3. A driver cannot accidentally create a vehicle for another driver.
+4. A passenger cannot create a vehicle.
+5. Vehicle lookup must respect ownership where appropriate.
+6. Use existing AppError and ERROR_CODES.
+7. Do not leak Prisma errors directly to clients.
+
+If the current schema already has unique constraints such as vehicle plate uniqueness, rely on those constraints and convert expected conflicts into the project's standard application-level error where necessary.
+
+Do not add unnecessary abstractions.
+
+---
+
+# Architecture
+
+Follow the project's current module structure:
+
+```text
+route
+  ↓
+controller
+  ↓
+service
+  ↓
+Prisma
+```
+
+Use the existing shared helpers and error architecture.
+
+Do not introduce repositories, microservices, events, queues, or other abstractions for this task.
+
+---
+
+# Seed/demo consideration
+
+Do NOT build the full seed system in this task.
+
+However, the implementation must remain compatible with the challenge's required demo cast:
+
+```text
+Jashim → driver
+Bullet → vehicle
+Nusrat → passenger
+Rafiq → passenger
+Shirin → passenger
+```
+
+The actual seed data can be handled as a dedicated task later.
+
+---
+
+# Verification
+
+Test the real HTTP API.
+
+At minimum verify:
+
+### Zone
+
+1. `GET /zones` returns predefined zones.
+2. `GET /zones/:id` returns a valid zone.
+3. Invalid/nonexistent zone returns the project's appropriate error.
+
+### Vehicle
+
+4. DRIVER can create a vehicle.
+5. PASSENGER cannot create a vehicle → `403`.
+6. Driver cannot create a vehicle belonging to another driver.
+7. Driver can retrieve their own vehicle.
+8. Another driver cannot access a vehicle they do not own.
+9. Duplicate vehicle plate/unique constraint behaves correctly.
+
+Use actual authentication tokens generated through the existing login flow.
+
+---
+
+# Quality checks
+
+Run:
+
+```bash
+pnpm run typecheck
+```
+
+Run relevant tests/lint commands if already configured.
+
+Then:
+
+```bash
+git diff --check
+git status
+```
+
+Inspect the final diff for unrelated changes.
+
+---
+
+# Final report
+
+Report:
+
+1. Files created/modified.
+2. Zone endpoints added.
+3. Vehicle endpoints added.
+4. Authentication/role enforcement.
+5. Ownership enforcement.
+6. Capacity handling.
+7. Validation.
+8. Runtime test results.
+9. Typecheck/lint results.
+10. Any assumptions or issues.
+
+STOP after Zone + Vehicle foundation.
+
+Do NOT implement:
+
+* RideRequest
+* Pool
+* PoolMember
+* Matching
+* Fare
+* Ride lifecycle
+* Cancellation
+* Payment
+* Ride history
+
+Those are later Phase 3 tasks.

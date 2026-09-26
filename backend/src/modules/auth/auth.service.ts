@@ -1,11 +1,11 @@
 import type { User } from "../../generated/prisma/client.js";
-import { Prisma, UserRole, UserStatus } from "../../generated/prisma/client.js";
+import { Prisma, UserRole, UserStatus, DriverApplicationStatus } from "../../generated/prisma/client.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { ERROR_CODES } from "../../common/errors/errorCodes.js";
 import { comparePassword, hashPassword } from "../../common/utils/password.js";
-import { signAccessToken, signRefreshToken } from "../../common/utils/jwt.js";
+import { verifyRefreshToken, signAccessToken, signRefreshToken } from "../../common/utils/jwt.js";
 import { prisma } from "../../config/database.js";
-import type { LoginInput, RegisterInput } from "./auth.validation.js";
+import type { LoginInput, RegisterInput, RefreshTokenInput, DriverApplicationInput } from "./auth.validation.js";
 
 export interface SafeUser {
     id: string;
@@ -22,6 +22,10 @@ export interface LoginResult {
     user: SafeUser;
     accessToken: string;
     refreshToken: string;
+}
+
+export interface RefreshResult {
+    accessToken: string;
 }
 
 export function sanitizeUser(user: User): SafeUser {
@@ -127,5 +131,81 @@ export const authService = {
             accessToken,
             refreshToken,
         };
+    },
+
+    async refreshAccessToken(input: RefreshTokenInput): Promise<RefreshResult> {
+        let payload;
+        try {
+            payload = await verifyRefreshToken(input.refreshToken);
+        } catch {
+            throw new AppError("Invalid or expired refresh token", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: payload.sub },
+        });
+
+        if (!user) {
+            throw new AppError("Invalid or expired refresh token", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        if (user.status !== UserStatus.ACTIVE) {
+            throw new AppError("Invalid or expired refresh token", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        const accessToken = await signAccessToken({ sub: user.id, role: user.role });
+
+        return { accessToken };
+    },
+
+    async me(userId: string): Promise<SafeUser> {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new AppError("User not found", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        return sanitizeUser(user);
+    },
+
+    async applyForDriver(userId: string, input: DriverApplicationInput): Promise<SafeUser> {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { driverApplication: true },
+        });
+
+        if (!user) {
+            throw new AppError("User not found", 401, ERROR_CODES.UNAUTHORIZED);
+        }
+
+        if (user.status !== UserStatus.ACTIVE) {
+            throw new AppError("User account is inactive", 403, ERROR_CODES.FORBIDDEN);
+        }
+
+        if (user.role === UserRole.DRIVER || user.driverApplication) {
+            throw new AppError("User already has a driver application or is already a driver", 409, ERROR_CODES.CONFLICT);
+        }
+
+        const updatedUser = await prisma.$transaction(async (tx) => {
+            await tx.driverApplication.create({
+                data: {
+                    userId,
+                    licenseNumber: input.licenseNumber,
+                    vehicleModel: input.vehicleModel,
+                    vehiclePlateNumber: input.vehiclePlateNumber,
+                    status: DriverApplicationStatus.APPROVED,
+                    reviewedAt: new Date(),
+                },
+            });
+
+            return tx.user.update({
+                where: { id: userId },
+                data: { role: UserRole.DRIVER },
+            });
+        });
+
+        return sanitizeUser(updatedUser);
     },
 };
