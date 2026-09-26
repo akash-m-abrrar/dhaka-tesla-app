@@ -1,0 +1,21 @@
+enum RideHistoryEventType {
+  REQUESTED
+  MATCHED
+  DRIVER_ARRIVED
+  STARTED
+  COMPLETED
+  CANCELLED
+}
+
+model RideHistory {
+  id        String               @id @default(uuid()) @db.Uuid
+  poolId    String               @map("pool_id") @db.Uuid
+  eventType RideHistoryEventType @map("event_type")
+  note      String?              @db.Text
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  pool Pool @relation(fields: [poolId], references: [id])
+
+  @@index([poolId])
+  @@map("ride_history")
+}

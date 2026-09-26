@@ -1,0 +1,19 @@
+enum ZoneType {
+  AREA
+  POINT
+}
+
+model Zone {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(50)
+  type      ZoneType
+  latitude  Decimal  @db.Decimal(9, 6)
+  longitude Decimal  @db.Decimal(9, 6)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  pickupRideRequests      RideRequest[] @relation("PickupZone")
+  destinationRideRequests RideRequest[] @relation("DestinationZone")
+
+  @@map("zones")
+}

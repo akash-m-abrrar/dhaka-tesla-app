@@ -1,0 +1,21 @@
+enum VehicleStatus {
+  ONLINE
+  OFFLINE
+}
+
+model Vehicle {
+  id          String        @id @default(uuid()) @db.Uuid
+  ownerId     String        @map("owner_id") @db.Uuid
+  model       String        @db.VarChar(50)
+  capacity    Int
+  plateNumber String        @unique @map("plate_number") @db.VarChar(20)
+  status      VehicleStatus @default(OFFLINE)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  owner User   @relation("UserVehicles", fields: [ownerId], references: [id])
+  pools Pool[]
+
+  @@index([ownerId])
+  @@map("vehicles")
+}
