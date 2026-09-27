@@ -16,6 +16,6 @@ export const createRideRequestSchema = z.object({
     requestedSeats: z
         .int("Seats must be a whole number")
         .min(1, "At least 1 seat must be requested"),
-});
+}).strict();
 
 export type CreateRideRequestInput = z.infer<typeof createRideRequestSchema>;

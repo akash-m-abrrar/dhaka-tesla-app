@@ -21,6 +21,18 @@ const INITIAL_ZONES = [
     longitude: 90.4047,
   },
   {
+    name: "Mohakhali",
+    type: ZoneType.AREA,
+    latitude: 23.7808,
+    longitude: 90.4005,
+  },
+  {
+    name: "Gulshan 1",
+    type: ZoneType.AREA,
+    latitude: 23.7806,
+    longitude: 90.4169,
+  },
+  {
     name: "Dhanmondi 27",
     type: ZoneType.AREA,
     latitude: 23.7542,

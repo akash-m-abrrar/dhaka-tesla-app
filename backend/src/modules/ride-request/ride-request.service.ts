@@ -3,74 +3,95 @@ import { AppError } from "../../common/errors/AppError.js";
 import { ERROR_CODES } from "../../common/errors/errorCodes.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { assertOwnership } from "../../common/utils/ownership.js";
+import { calculateEstimatedFare } from "../../common/utils/fare.js";
 import type { CreateRideRequestInput } from "./ride-request.validation.js";
 
-// Temporary fare placeholder (BDT 0) until the dedicated fare-calculation task.
-// The schema requires a non-null Int. The final fare will be computed by a
-// deterministic formula in a later task. This value must never be exposed
-// to the client as a real fare amount.
-const TEMPORARY_ESTIMATED_FARE = 0;
+type FareZone = { id: string; latitude: number | Prisma.Decimal; longitude: number | Prisma.Decimal };
+type RideRequestCreateData = {
+    passengerId: string;
+    pickupZoneId: string;
+    destinationZoneId: string;
+    requestedSeats: number;
+    estimatedFare: number;
+};
+export interface RideRequestCreateDependencies {
+    findZones(ids: string[]): Promise<FareZone[]>;
+    createRequest(data: RideRequestCreateData): Promise<unknown>;
+}
+
+const prismaCreateDependencies: RideRequestCreateDependencies = {
+    findZones: (ids) => prisma.zone.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, latitude: true, longitude: true },
+    }),
+    createRequest: (data) => prisma.rideRequest.create({
+        data: { ...data },
+    }),
+};
+
+export async function createRideRequest(
+    passengerId: string,
+    input: CreateRideRequestInput,
+    dependencies: RideRequestCreateDependencies = prismaCreateDependencies,
+) {
+    const { pickupZoneId, destinationZoneId, requestedSeats } = input;
+
+    if (pickupZoneId === destinationZoneId) {
+        throw new AppError(
+            "Pickup and destination zones must be different",
+            400,
+            ERROR_CODES.BUSINESS_RULE_ERROR,
+        );
+    }
+
+    const foundZones = await dependencies.findZones([pickupZoneId, destinationZoneId]);
+    if (foundZones.length !== 2) {
+        const foundIds = new Set(foundZones.map((zone) => zone.id));
+        if (!foundIds.has(pickupZoneId)) {
+            throw new AppError("Pickup zone not found", 404, ERROR_CODES.NOT_FOUND);
+        }
+        throw new AppError("Destination zone not found", 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const pickupZone = foundZones.find((zone) => zone.id === pickupZoneId);
+    const destinationZone = foundZones.find((zone) => zone.id === destinationZoneId);
+    if (!pickupZone || !destinationZone) {
+        throw new AppError("Ride zones could not be loaded", 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const estimatedFare = calculateEstimatedFare(
+        { latitude: Number(pickupZone.latitude), longitude: Number(pickupZone.longitude) },
+        { latitude: Number(destinationZone.latitude), longitude: Number(destinationZone.longitude) },
+    );
+
+    try {
+        return await dependencies.createRequest({
+            passengerId,
+            pickupZoneId,
+            destinationZoneId,
+            requestedSeats,
+            estimatedFare,
+        });
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2023") {
+            throw new AppError("Invalid zone ID format", 400, ERROR_CODES.VALIDATION_ERROR);
+        }
+        throw error;
+    }
+}
 
 export const rideRequestService = {
     /**
      * Create a new RideRequest for the authenticated passenger.
      *
      * Complexity: O(1) application-level work.
-     * DB queries: 2 — one zone validation (findMany with IN), one insert.
+     * DB queries: 2 — one indexed zone lookup with IN, one insert.
      *
      * Zone validation uses a single `findMany` with `id: { in: [...] }` so
      * both zones are checked in one round-trip instead of two.
      */
     async create(passengerId: string, input: CreateRideRequestInput) {
-        const { pickupZoneId, destinationZoneId, requestedSeats } = input;
-
-        // Business rule: pickup and destination must be different zones.
-        // A same-zone trip is meaningless for the Dhaka pool MVP.
-        if (pickupZoneId === destinationZoneId) {
-            throw new AppError(
-                "Pickup and destination zones must be different",
-                400,
-                ERROR_CODES.BUSINESS_RULE_ERROR,
-            );
-        }
-
-        // Single query to validate both zones — avoids two separate round-trips.
-        // We only select `id` since we only need to verify existence.
-        const foundZones = await prisma.zone.findMany({
-            where: { id: { in: [pickupZoneId, destinationZoneId] } },
-            select: { id: true },
-        });
-
-        if (foundZones.length !== 2) {
-            // Determine which zone is missing for a precise error message.
-            const foundIds = new Set(foundZones.map((z) => z.id));
-            if (!foundIds.has(pickupZoneId)) {
-                throw new AppError("Pickup zone not found", 404, ERROR_CODES.NOT_FOUND);
-            }
-            throw new AppError("Destination zone not found", 404, ERROR_CODES.NOT_FOUND);
-        }
-
-        try {
-            const rideRequest = await prisma.rideRequest.create({
-                data: {
-                    passengerId,
-                    pickupZoneId,
-                    destinationZoneId,
-                    requestedSeats,
-                    // Status defaults to PENDING via schema @default(PENDING).
-                    // estimatedFare is temporarily set to 0; will be computed
-                    // by the fare-calculation task.
-                    estimatedFare: TEMPORARY_ESTIMATED_FARE,
-                },
-            });
-
-            return rideRequest;
-        } catch (error) {
-            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2023") {
-                throw new AppError("Invalid zone ID format", 400, ERROR_CODES.VALIDATION_ERROR);
-            }
-            throw error;
-        }
+        return createRideRequest(passengerId, input);
     },
 
     /**
