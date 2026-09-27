@@ -6,3 +6,4 @@ node_modules
 !.env.docker.example
 
 /src/generated/prisma
+*.txt

@@ -9,6 +9,8 @@ import { notFoundMiddleware } from "./common/middleware/notFound.middleware.js";
 
 import { prisma } from "./config/database.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
+import { zoneRouter } from "./modules/zone/zone.routes.js";
+import { vehicleRouter } from "./modules/vehicle/vehicle.routes.js";
 
 export const app = express();
 
@@ -32,6 +34,8 @@ app.get("/api/v1/health", async (_req, res, next) => {
 });
 
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/zones", zoneRouter);
+app.use("/api/v1/vehicles", vehicleRouter);
 
 // 404 handler — must come after all routes
 app.use(notFoundMiddleware);
