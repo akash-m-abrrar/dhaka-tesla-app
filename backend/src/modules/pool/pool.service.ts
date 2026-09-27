@@ -6,6 +6,7 @@ import {
     PoolMemberStatus,
     PoolStatus,
     Prisma,
+    RideHistoryEventType,
     RideRequestStatus,
     VehicleStatus,
 } from "../../generated/prisma/client.js";
@@ -38,6 +39,26 @@ const ACTIVE_POOL_STATUSES: PoolStatus[] = [
     PoolStatus.STARTED,
 ];
 
+export const POOL_LIFECYCLE_TRANSITIONS = {
+    arrive: {
+        from: PoolStatus.MATCHED,
+        to: PoolStatus.DRIVER_ARRIVED,
+        eventType: RideHistoryEventType.DRIVER_ARRIVED,
+    },
+    start: {
+        from: PoolStatus.DRIVER_ARRIVED,
+        to: PoolStatus.STARTED,
+        eventType: RideHistoryEventType.STARTED,
+    },
+    complete: {
+        from: PoolStatus.STARTED,
+        to: PoolStatus.COMPLETED,
+        eventType: RideHistoryEventType.COMPLETED,
+    },
+} as const;
+
+export type PoolLifecycleAction = keyof typeof POOL_LIFECYCLE_TRANSITIONS;
+
 function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
     return error instanceof Prisma.PrismaClientKnownRequestError;
 }
@@ -45,8 +66,9 @@ function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRe
 export const poolService = {
     /**
      * Locks the vehicle while checking ownership/availability, then creates an
-     * empty pool. This is two SQL statements in one transaction. Pool fare is
-     * accumulated from individual request fares as members are accepted.
+     * empty pool and its REQUESTED timeline event atomically. This uses four
+     * SQL statements in one transaction. Pool fare is accumulated from
+     * individual request fares as members are accepted.
      */
     async create(driverId: string, input: CreatePoolInput) {
         try {
@@ -91,7 +113,7 @@ export const poolService = {
                     );
                 }
 
-                return tx.pool.create({
+                const pool = await tx.pool.create({
                     data: {
                         driverId,
                         vehicleId: vehicle.id,
@@ -104,6 +126,15 @@ export const poolService = {
                         createdAt: true,
                     },
                 });
+
+                await tx.rideHistory.create({
+                    data: {
+                        poolId: pool.id,
+                        eventType: RideHistoryEventType.REQUESTED,
+                    },
+                });
+
+                return pool;
             });
         } catch (error) {
             if (isKnownPrismaError(error) && error.code === "P2023") {
@@ -262,6 +293,15 @@ export const poolService = {
                     },
                 });
 
+                if (pool.poolStatus === PoolStatus.REQUESTED) {
+                    await tx.rideHistory.create({
+                        data: {
+                            poolId: pool.id,
+                            eventType: RideHistoryEventType.MATCHED,
+                        },
+                    });
+                }
+
                 return {
                     member,
                     occupancy: {
@@ -347,5 +387,72 @@ export const poolService = {
                 capacity: pool.vehicle.capacity,
             },
         };
+    },
+
+    /**
+     * Apply one fixed operational transition. A conditional update on the
+     * expected state makes concurrent/repeated actions single-winner; its
+     * history row is committed in the same transaction as the pool update.
+     * DB statements on success: ownership/state read, conditional update,
+     * history insert. Application work and memory are O(1).
+     */
+    async transitionLifecycle(
+        driverId: string,
+        poolId: string,
+        action: PoolLifecycleAction,
+    ) {
+        const transition = POOL_LIFECYCLE_TRANSITIONS[action];
+
+        return prisma.$transaction(async (tx) => {
+            const pool = await tx.pool.findUnique({
+                where: { id: poolId },
+                select: { id: true, driverId: true, status: true },
+            });
+            if (!pool) {
+                throw new AppError("Pool not found", 404, ERROR_CODES.NOT_FOUND);
+            }
+            assertOwnership(pool.driverId, driverId);
+            if (pool.status !== transition.from) {
+                throw new AppError(
+                    `Cannot ${action} pool while it is ${pool.status}`,
+                    409,
+                    ERROR_CODES.CONFLICT,
+                );
+            }
+
+            const transitionTime = new Date();
+            const result = await tx.pool.updateMany({
+                where: {
+                    id: pool.id,
+                    driverId,
+                    status: transition.from,
+                },
+                data: {
+                    status: transition.to,
+                    ...(action === "start" ? { startedAt: transitionTime } : {}),
+                    ...(action === "complete" ? { completedAt: transitionTime } : {}),
+                },
+            });
+            if (result.count !== 1) {
+                throw new AppError(
+                    "Pool state changed; refresh and try again",
+                    409,
+                    ERROR_CODES.CONFLICT,
+                );
+            }
+
+            await tx.rideHistory.create({
+                data: {
+                    poolId: pool.id,
+                    eventType: transition.eventType,
+                },
+            });
+
+            return {
+                poolId: pool.id,
+                status: transition.to,
+                occurredAt: transitionTime,
+            };
+        });
     },
 };
