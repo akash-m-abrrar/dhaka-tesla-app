@@ -9,4 +9,13 @@ export const poolRouter: Router = Router();
 poolRouter.use(authMiddleware, requireRole(UserRole.DRIVER));
 poolRouter.post("/", poolController.create);
 poolRouter.post("/:poolId/members", poolController.acceptRideRequest);
+poolRouter.patch("/:poolId/arrive", (req, res, next) =>
+    poolController.transitionLifecycle(req, res, next, "arrive"),
+);
+poolRouter.patch("/:poolId/start", (req, res, next) =>
+    poolController.transitionLifecycle(req, res, next, "start"),
+);
+poolRouter.patch("/:poolId/complete", (req, res, next) =>
+    poolController.transitionLifecycle(req, res, next, "complete"),
+);
 poolRouter.get("/:id", poolController.getById);

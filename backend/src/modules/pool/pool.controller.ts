@@ -1,10 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import { AppError } from "../../common/errors/AppError.js";
 import { ERROR_CODES } from "../../common/errors/errorCodes.js";
-import { poolService } from "./pool.service.js";
+import { poolService, type PoolLifecycleAction } from "./pool.service.js";
 import {
     acceptRideRequestSchema,
     createPoolSchema,
+    lifecycleActionBodySchema,
     poolIdSchema,
 } from "./pool.validation.js";
 
@@ -68,6 +69,43 @@ export const poolController = {
                 parsed.data,
             );
             res.status(201).json({ success: true, data: result });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async transitionLifecycle(
+        req: Request,
+        res: Response,
+        next: NextFunction,
+        action: PoolLifecycleAction,
+    ): Promise<void> {
+        try {
+            const driverId = req.user?.id;
+            if (!driverId) {
+                throw new AppError("Unauthorized access", 401, ERROR_CODES.UNAUTHORIZED);
+            }
+
+            const poolId = poolIdSchema.safeParse(req.params.poolId);
+            if (!poolId.success) {
+                throw new AppError(
+                    validationMessage(poolId.error),
+                    400,
+                    ERROR_CODES.VALIDATION_ERROR,
+                );
+            }
+
+            const parsedBody = lifecycleActionBodySchema.safeParse(req.body ?? {});
+            if (!parsedBody.success) {
+                throw new AppError(
+                    validationMessage(parsedBody.error),
+                    400,
+                    ERROR_CODES.VALIDATION_ERROR,
+                );
+            }
+
+            const result = await poolService.transitionLifecycle(driverId, poolId.data, action);
+            res.status(200).json({ success: true, data: result });
         } catch (error) {
             next(error);
         }

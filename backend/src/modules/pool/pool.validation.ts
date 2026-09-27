@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const poolIdSchema = z.string().uuid("Pool ID must be a valid UUID");
 
+export const lifecycleActionBodySchema = z.object({}).strict();
+
 export const createPoolSchema = z.object({
     vehicleId: z.string().uuid("Vehicle ID must be a valid UUID"),
 }).strict();
