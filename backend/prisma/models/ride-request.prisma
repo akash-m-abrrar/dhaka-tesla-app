@@ -24,5 +24,6 @@ model RideRequest {
   @@index([passengerId])
   @@index([pickupZoneId])
   @@index([destinationZoneId])
+  @@index([status, createdAt])
   @@map("ride_requests")
 }

@@ -12,6 +12,7 @@ import { authRouter } from "./modules/auth/auth.routes.js";
 import { zoneRouter } from "./modules/zone/zone.routes.js";
 import { vehicleRouter } from "./modules/vehicle/vehicle.routes.js";
 import { rideRequestRouter } from "./modules/ride-request/ride-request.routes.js";
+import { driverRouter } from "./modules/driver/driver.routes.js";
 
 export const app = express();
 
@@ -38,6 +39,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/zones", zoneRouter);
 app.use("/api/v1/vehicles", vehicleRouter);
 app.use("/api/v1/ride-requests", rideRequestRouter);
+app.use("/api/v1/driver", driverRouter);
 
 // 404 handler — must come after all routes
 app.use(notFoundMiddleware);

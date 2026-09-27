@@ -12,5 +12,12 @@ vehicleRouter.post("/", authMiddleware, requireRole(UserRole.DRIVER), vehicleCon
 // Driver can retrieve all their vehicles
 vehicleRouter.get("/", authMiddleware, requireRole(UserRole.DRIVER), vehicleController.getAll);
 
+vehicleRouter.patch(
+    "/:id/status",
+    authMiddleware,
+    requireRole(UserRole.DRIVER),
+    vehicleController.updateStatus,
+);
+
 // Driver can retrieve their own vehicle by ID
 vehicleRouter.get("/:id", authMiddleware, requireRole(UserRole.DRIVER), vehicleController.getById);

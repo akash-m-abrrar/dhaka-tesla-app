@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VehicleStatus } from "../../generated/prisma/client.js";
 
 export const createVehicleSchema = z.object({
     model: z
@@ -15,3 +16,9 @@ export const createVehicleSchema = z.object({
 });
 
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
+
+export const updateVehicleStatusSchema = z.object({
+    status: z.enum(VehicleStatus),
+}).strict();
+
+export type UpdateVehicleStatusInput = z.infer<typeof updateVehicleStatusSchema>;
