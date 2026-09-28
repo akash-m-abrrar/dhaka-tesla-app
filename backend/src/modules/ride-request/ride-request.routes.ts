@@ -29,3 +29,11 @@ rideRequestRouter.get(
     requireRole(UserRole.PASSENGER),
     rideRequestController.getById,
 );
+
+// Passenger cancels their own request.
+rideRequestRouter.patch(
+    "/:id/cancel",
+    authMiddleware,
+    requireRole(UserRole.PASSENGER),
+    rideRequestController.cancel,
+);

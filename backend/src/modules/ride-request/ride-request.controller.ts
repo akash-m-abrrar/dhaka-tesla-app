@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { rideRequestService } from "./ride-request.service.js";
-import { createRideRequestSchema } from "./ride-request.validation.js";
+import { createRideRequestSchema, rideRequestIdSchema } from "./ride-request.validation.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { ERROR_CODES } from "../../common/errors/errorCodes.js";
 
@@ -57,6 +57,32 @@ export const rideRequestController = {
 
             const requestId = req.params.id as string;
             const rideRequest = await rideRequestService.getById(requestId, passengerId);
+            res.status(200).json({
+                success: true,
+                data: rideRequest,
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async cancel(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const passengerId = req.user?.id;
+            if (!passengerId) {
+                throw new AppError("Unauthorized access", 401, ERROR_CODES.UNAUTHORIZED);
+            }
+
+            const parsedId = rideRequestIdSchema.safeParse(req.params.id);
+            if (!parsedId.success) {
+                const firstError = parsedId.error.issues[0];
+                const errorMessage = firstError
+                    ? `${firstError.path.join(".")}: ${firstError.message}`
+                    : "Validation failed";
+                throw new AppError(errorMessage, 400, ERROR_CODES.VALIDATION_ERROR);
+            }
+
+            const rideRequest = await rideRequestService.cancel(parsedId.data, passengerId);
             res.status(200).json({
                 success: true,
                 data: rideRequest,
