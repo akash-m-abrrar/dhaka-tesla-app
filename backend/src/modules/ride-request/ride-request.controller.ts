@@ -48,6 +48,20 @@ export const rideRequestController = {
         }
     },
 
+    async getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const passengerId = req.user?.id;
+            if (!passengerId) {
+                throw new AppError("Unauthorized access", 401, ERROR_CODES.UNAUTHORIZED);
+            }
+
+            const history = await rideRequestService.getHistoryByPassenger(passengerId);
+            res.status(200).json({ success: true, data: history });
+        } catch (error) {
+            next(error);
+        }
+    },
+
     async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const passengerId = req.user?.id;

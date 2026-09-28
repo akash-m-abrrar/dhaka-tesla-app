@@ -75,6 +75,29 @@ export const poolController = {
         }
     },
 
+    async getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const user = req.user;
+            if (!user?.id) {
+                throw new AppError("Unauthorized access", 401, ERROR_CODES.UNAUTHORIZED);
+            }
+
+            const poolId = poolIdSchema.safeParse(req.params.poolId);
+            if (!poolId.success) {
+                throw new AppError(
+                    validationMessage(poolId.error),
+                    400,
+                    ERROR_CODES.VALIDATION_ERROR,
+                );
+            }
+
+            const history = await poolService.getHistory(poolId.data, user.id, user.role);
+            res.status(200).json({ success: true, data: history });
+        } catch (error) {
+            next(error);
+        }
+    },
+
     async transitionLifecycle(
         req: Request,
         res: Response,

@@ -22,6 +22,14 @@ rideRequestRouter.get(
     rideRequestController.getAll,
 );
 
+// Passenger history is scoped to the authenticated passenger.
+rideRequestRouter.get(
+    "/history",
+    authMiddleware,
+    requireRole(UserRole.PASSENGER),
+    rideRequestController.getHistory,
+);
+
 // Passenger retrieves a single ride request by ID (ownership enforced in service)
 rideRequestRouter.get(
     "/:id",
