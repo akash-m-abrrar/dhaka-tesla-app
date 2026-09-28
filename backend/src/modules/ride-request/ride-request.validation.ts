@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const rideRequestIdSchema = z.string().uuid("Ride request ID must be a valid UUID");
+
 export const createRideRequestSchema = z.object({
     // Both zone IDs must be valid non-empty strings (UUID format validated at DB level)
     pickupZoneId: z

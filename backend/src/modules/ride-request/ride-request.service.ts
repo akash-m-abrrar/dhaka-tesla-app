@@ -1,7 +1,12 @@
 import { prisma } from "../../config/database.js";
 import { AppError } from "../../common/errors/AppError.js";
 import { ERROR_CODES } from "../../common/errors/errorCodes.js";
-import { Prisma } from "../../generated/prisma/client.js";
+import {
+    PoolMemberStatus,
+    PoolStatus,
+    Prisma,
+    RideRequestStatus,
+} from "../../generated/prisma/client.js";
 import { assertOwnership } from "../../common/utils/ownership.js";
 import { calculateEstimatedFare } from "../../common/utils/fare.js";
 import type { CreateRideRequestInput } from "./ride-request.validation.js";
@@ -141,6 +146,168 @@ export const rideRequestService = {
         } catch (error) {
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2023") {
                 throw new AppError("Ride request not found", 404, ERROR_CODES.NOT_FOUND);
+            }
+            throw error;
+        }
+    },
+
+    /**
+     * Cancel a passenger's request while it is pending or before its pool
+     * starts. Pool/member/request changes share one transaction so fare and
+     * occupancy cannot be left partially updated.
+     */
+    async cancel(id: string, passengerId: string) {
+        try {
+            return await prisma.$transaction(async (tx) => {
+                const rideRequest = await tx.rideRequest.findUnique({
+                    where: { id },
+                    select: {
+                        id: true,
+                        passengerId: true,
+                        status: true,
+                        poolMember: {
+                            select: {
+                                id: true,
+                                poolId: true,
+                                fare: true,
+                                status: true,
+                            },
+                        },
+                    },
+                });
+
+                if (!rideRequest) {
+                    throw new AppError("Ride request not found", 404, ERROR_CODES.NOT_FOUND);
+                }
+                assertOwnership(rideRequest.passengerId, passengerId);
+
+                if (rideRequest.status === RideRequestStatus.CANCELLED) {
+                    throw new AppError(
+                        "Ride request is already cancelled",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
+
+                if (rideRequest.status === RideRequestStatus.PENDING) {
+                    return tx.rideRequest.update({
+                        where: {
+                            id: rideRequest.id,
+                            passengerId,
+                            status: RideRequestStatus.PENDING,
+                        },
+                        data: { status: RideRequestStatus.CANCELLED },
+                    });
+                }
+
+                if (
+                    rideRequest.status !== RideRequestStatus.MATCHED &&
+                    rideRequest.status !== RideRequestStatus.ACCEPTED
+                ) {
+                    throw new AppError(
+                        "Ride request cannot be cancelled in its current state",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
+
+                const member = rideRequest.poolMember;
+                if (!member || member.status === PoolMemberStatus.CANCELLED) {
+                    throw new AppError(
+                        "Ride request has no active pool membership",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
+
+                // Serialize against driver start and concurrent fare changes.
+                // The FOR UPDATE result reflects a preceding state transition
+                // if this transaction had to wait for its row lock.
+                const pools = await tx.$queryRaw<{ status: PoolStatus }[]>(Prisma.sql`
+                    SELECT status
+                    FROM pools
+                    WHERE id = ${member.poolId}::uuid
+                    FOR UPDATE
+                `);
+                const pool = pools[0];
+                if (!pool) {
+                    throw new AppError("Pool not found", 404, ERROR_CODES.NOT_FOUND);
+                }
+                if (
+                    pool.status !== PoolStatus.REQUESTED &&
+                    pool.status !== PoolStatus.MATCHED &&
+                    pool.status !== PoolStatus.DRIVER_ARRIVED
+                ) {
+                    throw new AppError(
+                        "Ride cannot be cancelled after the trip has started",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
+
+                const cancelledAt = new Date();
+                const updatedRequest = await tx.rideRequest.update({
+                    where: {
+                        id: rideRequest.id,
+                        passengerId,
+                        status: { in: [RideRequestStatus.MATCHED, RideRequestStatus.ACCEPTED] },
+                    },
+                    data: { status: RideRequestStatus.CANCELLED },
+                });
+
+                const updatedMember = await tx.poolMember.updateMany({
+                    where: {
+                        id: member.id,
+                        status: { in: [PoolMemberStatus.PENDING, PoolMemberStatus.PAID] },
+                    },
+                    data: {
+                        status: PoolMemberStatus.CANCELLED,
+                        leftAt: cancelledAt,
+                    },
+                });
+                if (updatedMember.count !== 1) {
+                    throw new AppError(
+                        "Pool membership has already changed",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
+
+                const updatedPool = await tx.pool.updateMany({
+                    where: {
+                        id: member.poolId,
+                        status: {
+                            in: [
+                                PoolStatus.REQUESTED,
+                                PoolStatus.MATCHED,
+                                PoolStatus.DRIVER_ARRIVED,
+                            ],
+                        },
+                    },
+                    data: { estimatedFare: { decrement: member.fare } },
+                });
+                if (updatedPool.count !== 1) {
+                    throw new AppError(
+                        "Pool state changed; cancellation was not applied",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
+
+                return updatedRequest;
+            });
+        } catch (error) {
+            if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                if (error.code === "P2023") {
+                    throw new AppError("Ride request not found", 404, ERROR_CODES.NOT_FOUND);
+                }
+                if (error.code === "P2025") {
+                    throw new AppError(
+                        "Ride request state changed; refresh and try again",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
             }
             throw error;
         }

@@ -29,6 +29,12 @@ type LockedPool = {
     capacity: number;
 };
 
+type LockedPoolForCancellation = {
+    id: string;
+    driverId: string;
+    status: PoolStatus;
+};
+
 type Occupancy = { occupiedSeats: number };
 
 const ACCEPTING_POOL_STATUSES: PoolStatus[] = [PoolStatus.REQUESTED, PoolStatus.MATCHED];
@@ -453,6 +459,117 @@ export const poolService = {
                 status: transition.to,
                 occurredAt: transitionTime,
             };
+        });
+    },
+
+    /**
+     * Cancel a pool and its active memberships as one operation. Locking the
+     * pool serializes this against acceptance, passenger cancellation, and
+     * lifecycle transitions. Application work is O(m) for m active members.
+     */
+    async cancel(driverId: string, poolId: string, reason: string) {
+        const cleanedReason = typeof reason === "string" ? reason.trim() : "";
+        if (
+            cleanedReason.length === 0 ||
+            cleanedReason.length > 500 ||
+            !/[\p{L}\p{N}]/u.test(cleanedReason)
+        ) {
+            throw new AppError(
+                "Cancellation reason must contain text and be at most 500 characters",
+                400,
+                ERROR_CODES.VALIDATION_ERROR,
+            );
+        }
+
+        return prisma.$transaction(async (tx) => {
+            const pools = await tx.$queryRaw<LockedPoolForCancellation[]>(Prisma.sql`
+                SELECT id::text AS id,
+                       driver_id::text AS "driverId",
+                       status
+                FROM pools
+                WHERE id = ${poolId}::uuid
+                FOR UPDATE
+            `);
+            const pool = pools[0];
+            if (!pool) {
+                throw new AppError("Pool not found", 404, ERROR_CODES.NOT_FOUND);
+            }
+
+            assertOwnership(pool.driverId, driverId);
+            if (
+                pool.status !== PoolStatus.REQUESTED &&
+                pool.status !== PoolStatus.MATCHED &&
+                pool.status !== PoolStatus.DRIVER_ARRIVED
+            ) {
+                throw new AppError(
+                    "Pool cannot be cancelled in its current state",
+                    409,
+                    ERROR_CODES.CONFLICT,
+                );
+            }
+
+            const cancelledPool = await tx.pool.updateMany({
+                where: {
+                    id: pool.id,
+                    driverId,
+                    status: pool.status,
+                },
+                data: { status: PoolStatus.CANCELLED },
+            });
+            if (cancelledPool.count !== 1) {
+                throw new AppError(
+                    "Pool state changed; refresh and try again",
+                    409,
+                    ERROR_CODES.CONFLICT,
+                );
+            }
+
+            const activeMembers = await tx.poolMember.findMany({
+                where: {
+                    poolId: pool.id,
+                    status: { in: [PoolMemberStatus.PENDING, PoolMemberStatus.PAID] },
+                },
+                select: { id: true, rideRequestId: true },
+            });
+            const cancelledAt = new Date();
+            if (activeMembers.length > 0) {
+                const memberIds = activeMembers.map((member) => member.id);
+                const cancelledMembers = await tx.poolMember.updateMany({
+                    where: {
+                        id: { in: memberIds },
+                        status: { in: [PoolMemberStatus.PENDING, PoolMemberStatus.PAID] },
+                    },
+                    data: {
+                        status: PoolMemberStatus.CANCELLED,
+                        leftAt: cancelledAt,
+                    },
+                });
+                if (cancelledMembers.count !== activeMembers.length) {
+                    throw new AppError(
+                        "Pool membership changed; cancellation was not applied",
+                        409,
+                        ERROR_CODES.CONFLICT,
+                    );
+                }
+
+                await tx.rideRequest.updateMany({
+                    where: {
+                        id: { in: activeMembers.map((member) => member.rideRequestId) },
+                        status: { in: [RideRequestStatus.ACCEPTED, RideRequestStatus.MATCHED] },
+                    },
+                    data: { status: RideRequestStatus.CANCELLED },
+                });
+            }
+
+            await tx.rideHistory.create({
+                data: {
+                    poolId: pool.id,
+                    eventType: RideHistoryEventType.CANCELLED,
+                    note: cleanedReason,
+                },
+            });
+
+            return { id: pool.id, status: PoolStatus.CANCELLED };
         });
     },
 };

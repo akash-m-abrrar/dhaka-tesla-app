@@ -4,6 +4,7 @@ import { ERROR_CODES } from "../../common/errors/errorCodes.js";
 import { poolService, type PoolLifecycleAction } from "./pool.service.js";
 import {
     acceptRideRequestSchema,
+    cancelPoolSchema,
     createPoolSchema,
     lifecycleActionBodySchema,
     poolIdSchema,
@@ -105,6 +106,38 @@ export const poolController = {
             }
 
             const result = await poolService.transitionLifecycle(driverId, poolId.data, action);
+            res.status(200).json({ success: true, data: result });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async cancel(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const driverId = req.user?.id;
+            if (!driverId) {
+                throw new AppError("Unauthorized access", 401, ERROR_CODES.UNAUTHORIZED);
+            }
+
+            const poolId = poolIdSchema.safeParse(req.params.poolId);
+            if (!poolId.success) {
+                throw new AppError(
+                    validationMessage(poolId.error),
+                    400,
+                    ERROR_CODES.VALIDATION_ERROR,
+                );
+            }
+
+            const parsed = cancelPoolSchema.safeParse(req.body ?? {});
+            if (!parsed.success) {
+                throw new AppError(
+                    validationMessage(parsed.error),
+                    400,
+                    ERROR_CODES.VALIDATION_ERROR,
+                );
+            }
+
+            const result = await poolService.cancel(driverId, poolId.data, parsed.data.reason);
             res.status(200).json({ success: true, data: result });
         } catch (error) {
             next(error);

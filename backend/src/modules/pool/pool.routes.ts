@@ -9,6 +9,7 @@ export const poolRouter: Router = Router();
 poolRouter.use(authMiddleware, requireRole(UserRole.DRIVER));
 poolRouter.post("/", poolController.create);
 poolRouter.post("/:poolId/members", poolController.acceptRideRequest);
+poolRouter.patch("/:poolId/cancel", poolController.cancel);
 poolRouter.patch("/:poolId/arrive", (req, res, next) =>
     poolController.transitionLifecycle(req, res, next, "arrive"),
 );
