@@ -121,6 +121,57 @@ export const rideRequestService = {
     },
 
     /**
+     * Return only this passenger's requests with their membership and pool
+     * timeline. Passenger cancellation is represented by request/member
+     * status; it does not add a pool-level cancellation event.
+     */
+    async getHistoryByPassenger(passengerId: string) {
+        return prisma.rideRequest.findMany({
+            where: { passengerId },
+            orderBy: { createdAt: "desc" },
+            select: {
+                id: true,
+                requestedSeats: true,
+                estimatedFare: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+                pickupZone: { select: { id: true, name: true } },
+                destinationZone: { select: { id: true, name: true } },
+                poolMember: {
+                    select: {
+                        id: true,
+                        poolId: true,
+                        seatNumber: true,
+                        fare: true,
+                        status: true,
+                        joinedAt: true,
+                        leftAt: true,
+                        pool: {
+                            select: {
+                                id: true,
+                                status: true,
+                                createdAt: true,
+                                startedAt: true,
+                                completedAt: true,
+                                history: {
+                                    orderBy: { createdAt: "asc" },
+                                    select: {
+                                        id: true,
+                                        eventType: true,
+                                        note: true,
+                                        createdAt: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+    },
+
+    /**
      * Return a single ride request by ID, enforcing passenger ownership.
      *
      * Complexity: O(1) application-level lookup.

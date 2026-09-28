@@ -8,6 +8,7 @@ import {
     Prisma,
     RideHistoryEventType,
     RideRequestStatus,
+    UserRole,
     VehicleStatus,
 } from "../../generated/prisma/client.js";
 import type { AcceptRideRequestInput, CreatePoolInput } from "./pool.validation.js";
@@ -64,6 +65,12 @@ export const POOL_LIFECYCLE_TRANSITIONS = {
 } as const;
 
 export type PoolLifecycleAction = keyof typeof POOL_LIFECYCLE_TRANSITIONS;
+
+export function buildPoolHistoryWhere(poolId: string, userId: string, role: UserRole) {
+    return role === UserRole.DRIVER
+        ? { id: poolId, driverId: userId }
+        : { id: poolId, members: { some: { passengerId: userId } } };
+}
 
 function isKnownPrismaError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
     return error instanceof Prisma.PrismaClientKnownRequestError;
@@ -393,6 +400,46 @@ export const poolService = {
                 capacity: pool.vehicle.capacity,
             },
         };
+    },
+
+    /** Read one pool's shared timeline for its driver or one of its passengers. */
+    async getHistory(poolId: string, userId: string, role: UserRole) {
+        const where = buildPoolHistoryWhere(poolId, userId, role);
+
+        const pool = await prisma.pool.findFirst({
+            where,
+            select: {
+                id: true,
+                driverId: true,
+                status: true,
+                createdAt: true,
+                startedAt: true,
+                completedAt: true,
+                history: {
+                    orderBy: { createdAt: "asc" },
+                    select: {
+                        id: true,
+                        eventType: true,
+                        note: true,
+                        createdAt: true,
+                    },
+                },
+            },
+        });
+
+        if (pool) {
+            const { driverId: _driverId, ...history } = pool;
+            return history;
+        }
+
+        const existingPool = await prisma.pool.findUnique({
+            where: { id: poolId },
+            select: { id: true },
+        });
+        if (!existingPool) {
+            throw new AppError("Pool not found", 404, ERROR_CODES.NOT_FOUND);
+        }
+        throw new AppError("Insufficient permissions", 403, ERROR_CODES.FORBIDDEN);
     },
 
     /**

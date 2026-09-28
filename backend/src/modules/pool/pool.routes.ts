@@ -6,7 +6,13 @@ import { poolController } from "./pool.controller.js";
 
 export const poolRouter: Router = Router();
 
-poolRouter.use(authMiddleware, requireRole(UserRole.DRIVER));
+poolRouter.use(authMiddleware);
+poolRouter.get(
+    "/:poolId/history",
+    requireRole(UserRole.DRIVER, UserRole.PASSENGER),
+    poolController.getHistory,
+);
+poolRouter.use(requireRole(UserRole.DRIVER));
 poolRouter.post("/", poolController.create);
 poolRouter.post("/:poolId/members", poolController.acceptRideRequest);
 poolRouter.patch("/:poolId/cancel", poolController.cancel);

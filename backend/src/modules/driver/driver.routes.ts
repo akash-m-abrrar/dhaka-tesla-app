@@ -7,6 +7,13 @@ import { driverController } from "./driver.controller.js";
 export const driverRouter: Router = Router();
 
 driverRouter.get(
+    "/ride-history",
+    authMiddleware,
+    requireRole(UserRole.DRIVER),
+    driverController.getRideHistory,
+);
+
+driverRouter.get(
     "/ride-requests",
     authMiddleware,
     requireRole(UserRole.DRIVER),

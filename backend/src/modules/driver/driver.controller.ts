@@ -17,4 +17,18 @@ export const driverController = {
             next(error);
         }
     },
+
+    async getRideHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const driverId = req.user?.id;
+            if (!driverId) {
+                throw new AppError("Unauthorized access", 401, ERROR_CODES.UNAUTHORIZED);
+            }
+
+            const history = await driverService.getRideHistory(driverId);
+            res.status(200).json({ success: true, data: history });
+        } catch (error) {
+            next(error);
+        }
+    },
 };
