@@ -3,16 +3,16 @@ import { z } from "zod";
 export const rideRequestIdSchema = z.string().uuid("Ride request ID must be a valid UUID");
 
 export const createRideRequestSchema = z.object({
-    // Both zone IDs must be valid non-empty strings (UUID format validated at DB level)
+    // Both zone IDs must be UUIDs so malformed values are rejected before PostgreSQL.
     pickupZoneId: z
         .string()
         .trim()
-        .min(1, "Pickup zone ID is required"),
+        .uuid("Pickup zone ID must be a valid UUID"),
 
     destinationZoneId: z
         .string()
         .trim()
-        .min(1, "Destination zone ID is required"),
+        .uuid("Destination zone ID must be a valid UUID"),
 
     // requestedSeats must be a positive integer (rejects decimals, negatives, zero)
     requestedSeats: z
