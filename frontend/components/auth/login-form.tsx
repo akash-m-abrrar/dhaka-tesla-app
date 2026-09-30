@@ -50,7 +50,7 @@ export function LoginForm() {
       toast.success("You’re signed in", {
         description: "Welcome back to Tesla Bullet.",
       });
-      router.replace("/");
+      router.replace("/dashboard");
     } catch (error) {
       const validationError = getValidationFieldError(error, loginFields);
 
