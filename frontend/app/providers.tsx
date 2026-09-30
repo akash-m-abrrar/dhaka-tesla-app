@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Provider as ReduxProvider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
+import { AuthBootstrap } from "@/components/auth/auth-bootstrap";
 import { ThemeSync } from "@/components/site/theme-sync";
 import { useAppSelector } from "@/lib/hooks";
 import { makeStore } from "@/lib/store";
@@ -30,6 +31,7 @@ export function Providers({ children }: Readonly<{ children: React.ReactNode }>)
 
   return (
     <ReduxProvider store={store}>
+      <AuthBootstrap />
       <ThemeSync />
       <QueryClientProvider client={queryClient}>
         {children}
