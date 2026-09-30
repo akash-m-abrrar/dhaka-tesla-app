@@ -14,27 +14,35 @@ import { SiteHeader } from "@/components/site/site-header";
 const steps = [
   {
     number: "01",
-    title: "Add your trip details",
+    title: "Choose your route",
     description:
-      "Enter your pickup spot and destination, and check prices for your trip.",
+      "Set your pickup and destination zones, then choose how many seats you need.",
     icon: MapPin,
     visual: "route",
   },
   {
     number: "02",
-    title: "Pay easily",
+    title: "Send your request",
     description:
-      "Add your preferred payment method, then choose among the ride options available in your location.",
-    icon: CircleDollarSign,
-    visual: "payment",
+      "Submit your ride request so a driver can review it and add it to a pool.",
+    icon: UsersRound,
+    visual: "match",
   },
   {
     number: "03",
-    title: "Meet your driver",
+    title: "Take the trip",
     description:
-      "Tesla Bullet will match you with a driver nearby, and you’ll get updates on your phone or computer about when to meet them.",
-    icon: UsersRound,
-    visual: "meeting",
+      "After a driver adds your request to a pool, meet them on arrival and follow the trip through completion.",
+    icon: Smartphone,
+    visual: "ride",
+  },
+  {
+    number: "04",
+    title: "Pay after completion",
+    description:
+      "When your ride is complete, choose Cash or TeslaPay. TeslaPay is currently simulated.",
+    icon: CircleDollarSign,
+    visual: "payment",
   },
 ];
 
@@ -180,12 +188,12 @@ export default function Home() {
                 Book your trip on your phone or computer.
               </h2>
               <p className="mt-5 max-w-[500px] text-base leading-7 text-muted-foreground">
-                From the first detail to meeting your driver, keep the journey
+                From sending your request to paying after the ride, each step is
                 easy to follow.
               </p>
             </div>
 
-            <div className="mt-12 grid gap-4 md:grid-cols-3 md:gap-5">
+            <div className="mt-12 grid gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-4">
               {steps.map((step) => {
                 const Icon = step.icon;
 
@@ -222,14 +230,28 @@ export default function Home() {
                           <div className="mt-2 h-1.5 w-28 rounded-full bg-border" />
                         </div>
                       )}
-                      {step.visual === "meeting" && (
+                      {step.visual === "match" && (
+                        <div className="relative flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
+                          <span className="grid size-10 place-items-center rounded-full bg-muted">
+                            <UsersRound aria-hidden="true" className="size-5" />
+                          </span>
+                          <div>
+                            <p className="text-xs font-semibold">Added to a pool</p>
+                            <p className="mt-1 text-[10px] text-muted-foreground">Driver matched</p>
+                          </div>
+                          <span className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-foreground text-background">
+                            <Check aria-hidden="true" className="size-3.5" />
+                          </span>
+                        </div>
+                      )}
+                      {step.visual === "ride" && (
                         <div className="relative flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
                           <span className="grid size-10 place-items-center rounded-full bg-muted">
                             <Smartphone aria-hidden="true" className="size-5" />
                           </span>
                           <div>
-                            <div className="h-2 w-20 rounded-full bg-foreground/80" />
-                            <div className="mt-2 h-1.5 w-14 rounded-full bg-border" />
+                            <p className="text-xs font-semibold">Ride in progress</p>
+                            <p className="mt-1 text-[10px] text-muted-foreground">Completed trip</p>
                           </div>
                           <span className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-foreground text-background">
                             <Check aria-hidden="true" className="size-3.5" />
