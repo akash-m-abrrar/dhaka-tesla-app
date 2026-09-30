@@ -1,54 +1,26 @@
-import { Container } from "@/components/site/container";
+"use client";
 
-const driverFeatures = [
-  {
-    title: "Vehicle",
-    description: "Vehicle details will be managed here in a future update.",
-  },
-  {
-    title: "Ride Requests",
-    description: "Available ride requests will appear here when implemented.",
-  },
-  {
-    title: "Pools",
-    description: "Pool tools are planned for a later milestone.",
-  },
-  {
-    title: "Ride History",
-    description: "Your completed rides will be listed here in a future update.",
-  },
-  {
-    title: "Payments",
-    description: "Payment tools are coming in a later milestone.",
-  },
-];
+import { Container } from "@/components/site/container";
+import { useCurrentUserQuery } from "@/lib/features/auth/hooks";
 
 export default function DriverPage() {
+  const { data: user } = useCurrentUserQuery();
+
   return (
-    <main>
-      <Container className="py-10 sm:py-14">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Driver space
-        </p>
+    <Container className="py-8 sm:py-12 lg:py-14">
+      <section className="max-w-3xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Driver overview</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.05em] sm:text-5xl">
-          Welcome to your driver space.
+          Welcome back{user?.name ? `, ${user.name}` : ""}.
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Your driver tools will live here. Vehicle and ride management are not available yet.
+          Your driver workspace will appear here as your vehicle and ride tools become available.
         </p>
-
-        <section aria-label="Driver features coming soon" className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {driverFeatures.map((feature) => (
-            <article className="min-h-44 rounded-3xl border border-border bg-card p-5" key={feature.title}>
-              <span className="inline-flex rounded-full border border-border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Coming next
-              </span>
-              <h2 className="mt-5 text-base font-semibold">{feature.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{feature.description}</p>
-            </article>
-          ))}
-        </section>
-      </Container>
-    </main>
+      </section>
+      <section aria-label="Driver workspace status" className="mt-10 border-t border-border pt-7 sm:mt-14 sm:pt-9">
+        <h2 className="text-lg font-semibold tracking-[-0.02em]">Your driver space</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Driver tools are not available yet.</p>
+      </section>
+    </Container>
   );
 }
