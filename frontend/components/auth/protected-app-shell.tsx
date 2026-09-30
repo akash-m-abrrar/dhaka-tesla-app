@@ -88,9 +88,12 @@ export function ProtectedAppShell({ children }: Readonly<{ children: React.React
         role={currentUser.role}
       />
       <div className="flex min-h-svh min-w-0 flex-1 flex-col">
+        <header className="hidden h-12 shrink-0 items-center border-b border-border px-4 md:flex">
+          <SidebarTrigger aria-label="Toggle navigation sidebar" className="size-9 rounded-lg border border-border hover:bg-muted" />
+        </header>
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur md:hidden">
           <SidebarTrigger
-            aria-label="Open navigation menu"
+            aria-label="Toggle navigation menu"
             className="size-11 rounded-lg border border-border hover:bg-muted"
           />
           <Link className="truncate text-xs font-semibold tracking-[0.16em]" href="/dashboard">

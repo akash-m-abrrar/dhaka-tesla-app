@@ -70,7 +70,7 @@ function AuthenticationActions({
     return (
       <>
         <span className="max-w-40 truncate text-sm text-muted-foreground">
-          {name ? `Hi, ${name}` : "Signed in"}
+          {name || "Signed in"}
         </span>
         <Button
           className={mobile ? "w-full rounded-full" : "rounded-full"}

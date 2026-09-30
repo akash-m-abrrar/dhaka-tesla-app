@@ -31,6 +31,7 @@ const passengerLinks = [
   { label: "Overview", href: "/passenger", icon: House },
   { label: "Request Ride", href: "/passenger/requests/new", icon: MapPin },
   { label: "My Requests", href: "/passenger/requests", icon: ClipboardList },
+  { label: "Ride History", href: "/passenger/ride-history", icon: History },
   { label: "Payments", href: "/passenger/payments", icon: CreditCard },
 ] as const;
 
@@ -39,6 +40,7 @@ const driverLinks = [
   { label: "Vehicle", href: "/driver/vehicle", icon: CarFront },
   { label: "Ride Requests", href: "/driver/ride-requests", icon: ClipboardList },
   { label: "Pools", href: "/driver/pools", icon: Route },
+  { label: "Ride History", href: "/driver/ride-history", icon: History },
 ] as const;
 
 export function AppSidebar({
@@ -67,13 +69,13 @@ export function AppSidebar({
   }
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader>
-        <Link className="inline-flex min-h-11 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href="/">
-          <span aria-hidden="true" className="grid size-9 place-items-center bg-foreground text-xs font-bold tracking-[-0.08em] text-background">
+        <Link className="inline-flex min-h-11 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:justify-center" href="/">
+          <span aria-hidden="true" className="grid size-8 place-items-center bg-foreground text-xs font-bold tracking-[-0.08em] text-background">
             TB
           </span>
-          <span className="text-xs font-semibold tracking-[0.16em]">TBTESLA BULLET</span>
+          <span className="text-xs font-semibold tracking-[0.16em] group-data-[collapsible=icon]:sr-only">TBTESLA BULLET</span>
         </Link>
       </SidebarHeader>
 
@@ -95,6 +97,7 @@ export function AppSidebar({
                       isActive={isActive}
                       render={navigationLink(href)}
                       size="lg"
+                      tooltip={label}
                     >
                       <Icon aria-hidden="true" className="size-4" />
                       <span>{label}</span>
@@ -102,36 +105,22 @@ export function AppSidebar({
                   </SidebarMenuItem>
                 );
               })}
-              {(role === "PASSENGER"
-                ? [{ label: "Ride History", icon: History }]
-                : [
-                    { label: "Ride History", icon: History },
-                  ]
-              ).map(({ label, icon: Icon }) => (
-                <SidebarMenuItem key={label}>
-                  <SidebarMenuButton className="h-12" disabled type="button">
-                    <Icon aria-hidden="true" className="size-4" />
-                    <span>{label}</span>
-                    <span className="ml-auto text-[9px] font-semibold uppercase tracking-[0.12em]">Coming soon</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
             </SidebarMenu>
           </SidebarGroup>
         </nav>
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
+        <div className="mb-4 flex items-center justify-between gap-3 group-data-[collapsible=icon]:justify-center">
+          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="truncate text-sm font-semibold">{name}</p>
             <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{role}</p>
           </div>
-          <ThemeToggle />
+          <div className="group-data-[collapsible=icon]:hidden"><ThemeToggle /></div>
         </div>
-        <Button className="w-full justify-start" onClick={onLogout} type="button" variant="outline">
+        <Button className="w-full justify-start group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0" onClick={onLogout} title="Log out" type="button" variant="outline">
           <LogOut aria-hidden="true" />
-          Log out
+          <span className="group-data-[collapsible=icon]:sr-only">Log out</span>
         </Button>
       </SidebarFooter>
     </Sidebar>
