@@ -122,7 +122,10 @@ export function VehicleManager() {
                   <div className="min-w-0">
                     <h2 className="truncate font-semibold">{vehicle.model}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{vehicle.plateNumber} <span aria-hidden="true">·</span> Capacity {vehicle.capacity}</p>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em]">{vehicle.status}</p>
+                    <p className={`mt-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] ${vehicle.status === "ONLINE" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                      <span className={`size-2 rounded-full ${vehicle.status === "ONLINE" ? "bg-emerald-600 dark:bg-emerald-400" : "bg-muted-foreground/50"}`} />
+                      {vehicle.status}
+                    </p>
                   </div>
                 </div>
                 <Button

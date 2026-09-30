@@ -85,9 +85,16 @@ export function AppSidebar({
             <SidebarGroupLabel>Workspace</SidebarGroupLabel>
             <SidebarMenu>
               {links.map(({ label, href, icon: Icon }) => {
-                const isActive = href === "/passenger/requests" || href === "/driver/pools"
-                  ? pathname === href || pathname.startsWith(`${href}/`)
-                  : pathname === href;
+                const isNestedRoute = pathname.startsWith(`${href}/`);
+                const isNewRideRequest =
+                  href === "/passenger/requests" &&
+                  (pathname === "/passenger/requests/new" ||
+                    pathname.startsWith("/passenger/requests/new/"));
+                const supportsNestedRoutes =
+                  href === "/passenger/requests" || href === "/driver/pools";
+                const isActive =
+                  pathname === href ||
+                  (supportsNestedRoutes && isNestedRoute && !isNewRideRequest);
 
                 return (
                   <SidebarMenuItem key={href}>
