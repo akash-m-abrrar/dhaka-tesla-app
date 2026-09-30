@@ -35,6 +35,9 @@ const passengerLinks = [
 
 const driverLinks = [
   { label: "Overview", href: "/driver", icon: House },
+  { label: "Vehicle", href: "/driver/vehicle", icon: CarFront },
+  { label: "Ride Requests", href: "/driver/ride-requests", icon: ClipboardList },
+  { label: "Active Pool", href: "/driver/pools", icon: Route },
 ] as const;
 
 export function AppSidebar({
@@ -79,7 +82,7 @@ export function AppSidebar({
             <SidebarGroupLabel>Workspace</SidebarGroupLabel>
             <SidebarMenu>
               {links.map(({ label, href, icon: Icon }) => {
-                const isActive = href === "/passenger/requests"
+                const isActive = href === "/passenger/requests" || href === "/driver/pools"
                   ? pathname === href || pathname.startsWith(`${href}/`)
                   : pathname === href;
 
@@ -104,9 +107,6 @@ export function AppSidebar({
                     { label: "Payments", icon: CreditCard },
                   ]
                 : [
-                    { label: "Vehicle", icon: CarFront },
-                    { label: "Ride Requests", icon: ClipboardList },
-                    { label: "Pools", icon: Route },
                     { label: "Ride History", icon: History },
                     { label: "Payments", icon: CreditCard },
                   ]
