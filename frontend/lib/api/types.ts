@@ -1,6 +1,6 @@
 export interface ApiSuccessEnvelope<T> {
   success: true;
-  message: string;
+  message?: string;
   data: T;
 }
 

@@ -5,6 +5,8 @@ export { API_BASE_URL, resolveApiUrl } from "@/lib/api/config";
 
 export type ApiHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+const API_REQUEST_TIMEOUT_MS = 30_000;
+
 export interface ApiRequestOptions {
   method?: ApiHttpMethod;
   body?: unknown;
@@ -67,7 +69,7 @@ const isApiSuccessEnvelope = <T>(
 ): value is ApiSuccessEnvelope<T> =>
   isRecord(value) &&
   value.success === true &&
-  typeof value.message === "string" &&
+  (!("message" in value) || typeof value.message === "string") &&
   "data" in value;
 
 async function requestOnce<T>(
@@ -85,29 +87,58 @@ async function requestOnce<T>(
     headers.set("Authorization", `Bearer ${options.accessToken}`);
   }
 
-  const response = await fetch(resolveApiUrl(path), {
-    method: options.method ?? (options.body === undefined ? "GET" : "POST"),
-    headers,
-    body:
-      options.body === undefined ? undefined : JSON.stringify(options.body),
-    signal: options.signal,
-    cache: options.cache,
-  });
-
-  let responseBody: unknown;
-
-  try {
-    const responseText = await response.text();
-    responseBody = responseText ? JSON.parse(responseText) : undefined;
-  } catch {
-    throw new ApiError(
-      response.status,
-      "INVALID_RESPONSE",
-      "The server returned an unexpected response.",
-    );
+  const controller = new AbortController();
+  let didTimeout = false;
+  const timeoutId = setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, API_REQUEST_TIMEOUT_MS);
+  const abortFromCaller = () => controller.abort();
+  if (options.signal?.aborted) {
+    controller.abort();
+  } else {
+    options.signal?.addEventListener("abort", abortFromCaller, { once: true });
   }
 
-  if (!response.ok) {
+  try {
+    const response = await fetch(resolveApiUrl(path), {
+      method: options.method ?? (options.body === undefined ? "GET" : "POST"),
+      headers,
+      body:
+        options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: controller.signal,
+      cache: options.cache,
+    });
+
+    let responseBody: unknown;
+
+    const responseText = await response.text();
+    try {
+      responseBody = responseText ? JSON.parse(responseText) : undefined;
+    } catch {
+      throw new ApiError(
+        response.status,
+        "INVALID_RESPONSE",
+        "The server returned an unexpected response.",
+      );
+    }
+
+    if (!response.ok) {
+      if (isApiErrorEnvelope(responseBody)) {
+        throw new ApiError(
+          response.status,
+          responseBody.error.code,
+          responseBody.error.message,
+        );
+      }
+
+      throw new ApiError(
+        response.status,
+        "HTTP_ERROR",
+        "The request could not be completed.",
+      );
+    }
+
     if (isApiErrorEnvelope(responseBody)) {
       throw new ApiError(
         response.status,
@@ -116,30 +147,28 @@ async function requestOnce<T>(
       );
     }
 
-    throw new ApiError(
-      response.status,
-      "HTTP_ERROR",
-      "The request could not be completed.",
-    );
-  }
+    if (!isApiSuccessEnvelope<T>(responseBody)) {
+      throw new ApiError(
+        response.status,
+        "INVALID_RESPONSE",
+        "The server returned an unexpected response.",
+      );
+    }
 
-  if (isApiErrorEnvelope(responseBody)) {
-    throw new ApiError(
-      response.status,
-      responseBody.error.code,
-      responseBody.error.message,
-    );
+    return responseBody.data;
+  } catch (error) {
+    if (didTimeout) {
+      throw new ApiError(
+        408,
+        "REQUEST_TIMEOUT",
+        "The server took too long to respond. Check your connection and try again.",
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    options.signal?.removeEventListener("abort", abortFromCaller);
   }
-
-  if (!isApiSuccessEnvelope<T>(responseBody)) {
-    throw new ApiError(
-      response.status,
-      "INVALID_RESPONSE",
-      "The server returned an unexpected response.",
-    );
-  }
-
-  return responseBody.data;
 }
 
 function isRefreshableRequest(path: string, options: ApiRequestOptions): boolean {
