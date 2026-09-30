@@ -33,5 +33,26 @@ export const loginFormSchema = z.object({
     .max(255, "Password must be 255 characters or fewer."),
 });
 
+export const driverApplicationFormSchema = z.object({
+  licenseNumber: z
+    .string()
+    .trim()
+    .min(1, "Enter your license number.")
+    .max(50, "License number must be 50 characters or fewer."),
+  vehicleModel: z
+    .string()
+    .trim()
+    .min(1, "Enter your vehicle model.")
+    .max(50, "Vehicle model must be 50 characters or fewer."),
+  vehiclePlateNumber: z
+    .string()
+    .trim()
+    .min(1, "Enter your vehicle plate number.")
+    .max(20, "Vehicle plate number must be 20 characters or fewer."),
+});
+
 export type RegisterFormValues = z.infer<typeof registerFormSchema>;
 export type LoginFormValues = z.infer<typeof loginFormSchema>;
+export type DriverApplicationFormValues = z.infer<
+  typeof driverApplicationFormSchema
+>;

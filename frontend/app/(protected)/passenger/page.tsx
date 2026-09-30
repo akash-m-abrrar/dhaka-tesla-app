@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight, ClipboardList, CreditCard, MapPin } from "lucide-react";
+import { DriverApplicationCard } from "@/components/auth/driver-application-card";
 import { Container } from "@/components/site/container";
 import { useCurrentUserQuery } from "@/lib/features/auth/hooks";
 
@@ -63,6 +64,10 @@ export default function PassengerPage() {
           <ArrowUpRight aria-hidden="true" className="size-5 shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </Link>
       </section>
+
+      <div className="mt-8">
+        <DriverApplicationCard />
+      </div>
 
       <section aria-labelledby="recent-activity-title" className="mt-10 border-t border-border pt-7 sm:mt-14 sm:pt-9">
         <h2 className="text-lg font-semibold tracking-[-0.02em]" id="recent-activity-title">Recent activity</h2>

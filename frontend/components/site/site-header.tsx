@@ -20,12 +20,28 @@ const navigation = [
   { label: "Contact", href: "#contact" },
 ];
 
-function NavigationLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavigationLinks({
+  authenticated,
+  mobile = false,
+  onNavigate,
+}: {
+  authenticated: boolean;
+  mobile?: boolean;
+  onNavigate?: () => void;
+}) {
+  const links = authenticated
+    ? [{ label: "Dashboard", href: "/dashboard" }, ...navigation]
+    : navigation;
+
   return (
     <>
-      {navigation.map((item) => (
+      {links.map((item) => (
         <Link
-          className="rounded-md py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className={`rounded-md py-2 text-sm font-medium transition-colors hover:text-foreground ${
+            item.label === "Dashboard"
+              ? "text-foreground"
+              : "text-muted-foreground"
+          } ${!mobile && (item.label === "About" || item.label === "Contact") ? "hidden lg:inline-flex" : ""}`}
           href={item.href}
           key={item.href}
           onClick={onNavigate}
@@ -150,8 +166,8 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav aria-label="Main navigation" className="hidden items-center gap-8 md:flex">
-          <NavigationLinks />
+        <nav aria-label="Main navigation" className="hidden items-center gap-5 md:flex lg:gap-8">
+          <NavigationLinks authenticated={authenticated} />
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
@@ -188,7 +204,11 @@ export function SiteHeader() {
           id="mobile-navigation"
         >
           <div className="mx-auto flex max-w-[1240px] flex-col gap-1">
-            <NavigationLinks onNavigate={() => setMenuOpen(false)} />
+            <NavigationLinks
+              authenticated={authenticated}
+              mobile
+              onNavigate={() => setMenuOpen(false)}
+            />
             <div className="mt-3 flex flex-col gap-3 border-t border-border pt-4">
               <AuthenticationActions
                 authenticated={authenticated}
