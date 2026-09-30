@@ -23,10 +23,10 @@ export function zonesQueryOptions() {
   });
 }
 
-export function passengerRideRequestsQueryOptions(accessToken: string | null) {
+export function passengerRideRequestsQueryOptions(accessToken: string | null, enabled = true) {
   return queryOptions({
     queryKey: rideRequestQueryKeys.passengerList(),
-    enabled: Boolean(accessToken),
+    enabled: Boolean(accessToken && enabled),
     queryFn: ({ signal }) => {
       if (!accessToken) {
         throw new Error("An access token is required to load ride requests.");

@@ -31,13 +31,14 @@ const passengerLinks = [
   { label: "Overview", href: "/passenger", icon: House },
   { label: "Request Ride", href: "/passenger/requests/new", icon: MapPin },
   { label: "My Requests", href: "/passenger/requests", icon: ClipboardList },
+  { label: "Payments", href: "/passenger/payments", icon: CreditCard },
 ] as const;
 
 const driverLinks = [
   { label: "Overview", href: "/driver", icon: House },
   { label: "Vehicle", href: "/driver/vehicle", icon: CarFront },
   { label: "Ride Requests", href: "/driver/ride-requests", icon: ClipboardList },
-  { label: "Active Pool", href: "/driver/pools", icon: Route },
+  { label: "Pools", href: "/driver/pools", icon: Route },
 ] as const;
 
 export function AppSidebar({
@@ -102,13 +103,9 @@ export function AppSidebar({
                 );
               })}
               {(role === "PASSENGER"
-                ? [
-                    { label: "Ride History", icon: History },
-                    { label: "Payments", icon: CreditCard },
-                  ]
+                ? [{ label: "Ride History", icon: History }]
                 : [
                     { label: "Ride History", icon: History },
-                    { label: "Payments", icon: CreditCard },
                   ]
               ).map(({ label, icon: Icon }) => (
                 <SidebarMenuItem key={label}>

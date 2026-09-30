@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useDriverRideRequestsQuery } from "@/lib/features/driver-ride-requests/hooks";
 import { useAcceptRideRequestMutation, usePoolDetailQuery, useTransitionPoolMutation } from "@/lib/features/pools/hooks";
 import type { PoolLifecycleAction, PoolStatus } from "@/lib/features/pools/types";
+import { DriverPoolPayments } from "@/components/payments/driver-pool-payments";
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -55,7 +56,7 @@ export function DriverPoolDetail({ poolId }: { poolId: string }) {
 
   return (
     <div className="grid gap-6">
-      <Link className="inline-flex min-h-10 w-fit items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground" href="/driver/pools"><ArrowLeft aria-hidden="true" className="size-4" />Active pools</Link>
+      <Link className="inline-flex min-h-10 w-fit items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground" href="/driver/pools"><ArrowLeft aria-hidden="true" className="size-4" />Pools</Link>
 
       <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -135,6 +136,7 @@ export function DriverPoolDetail({ poolId }: { poolId: string }) {
       {pool.status === "REQUESTED" && pool.members.length === 0 && <p className="text-sm text-muted-foreground">Add a pending ride request to match this pool before marking arrival.</p>}
       {pool.status === "COMPLETED" && <p className="text-sm text-muted-foreground">This trip is complete. No further lifecycle actions are available.</p>}
       {pool.status === "CANCELLED" && <p className="text-sm text-muted-foreground">This pool has been cancelled.</p>}
+      {pool.status === "COMPLETED" && <DriverPoolPayments poolId={poolId} />}
     </div>
   );
 }
