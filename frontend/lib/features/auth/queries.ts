@@ -10,6 +10,7 @@ export function currentUserQueryOptions(accessToken: string | null) {
   return queryOptions({
     queryKey: authQueryKeys.currentUser(),
     enabled: Boolean(accessToken),
+    retry: false,
     queryFn: ({ signal }) => {
       if (!accessToken) {
         throw new Error("An access token is required to fetch the current user.");
