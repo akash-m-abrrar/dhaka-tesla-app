@@ -32,6 +32,10 @@ const authSlice = createSlice({
       state.refreshToken = action.payload.refreshToken;
       state.status = "authenticated";
     },
+    accessTokenUpdated(state, action: PayloadAction<string>) {
+      state.accessToken = action.payload;
+      state.status = "authenticated";
+    },
     sessionInitializationFinished(state) {
       state.accessToken = null;
       state.refreshToken = null;
@@ -48,6 +52,7 @@ const authSlice = createSlice({
 export const {
   refreshTokenRestored,
   sessionEstablished,
+  accessTokenUpdated,
   sessionInitializationFinished,
   sessionCleared,
 } = authSlice.actions;

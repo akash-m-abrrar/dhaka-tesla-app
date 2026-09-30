@@ -52,5 +52,8 @@ export function logout(
 ): void {
   removePersistedRefreshToken();
   dispatch(sessionCleared());
-  queryClient.removeQueries({ queryKey: authQueryKeys.currentUser() });
+  queryClient.removeQueries({
+    queryKey: authQueryKeys.currentUser(),
+    exact: true,
+  });
 }

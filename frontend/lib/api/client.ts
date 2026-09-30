@@ -14,6 +14,17 @@ export interface ApiRequestOptions {
   cache?: RequestCache;
 }
 
+export interface ApiSessionTokens {
+  accessToken: string | null;
+  refreshToken: string | null;
+}
+
+export interface ApiAuthHandlers {
+  getSessionTokens(): ApiSessionTokens;
+  updateAccessToken(accessToken: string): void;
+  clearSession(): void;
+}
+
 export class ApiError extends Error {
   public readonly status: number;
   public readonly code: string;
@@ -28,6 +39,13 @@ export class ApiError extends Error {
     this.status = status;
     this.code = code;
   }
+}
+
+let authHandlers: ApiAuthHandlers | undefined;
+let refreshInFlight: Promise<string> | undefined;
+
+export function configureApiAuth(handlers: ApiAuthHandlers): void {
+  authHandlers = handlers;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -52,7 +70,7 @@ const isApiSuccessEnvelope = <T>(
   typeof value.message === "string" &&
   "data" in value;
 
-export async function apiRequest<T>(
+async function requestOnce<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
@@ -122,4 +140,109 @@ export async function apiRequest<T>(
   }
 
   return responseBody.data;
+}
+
+function isRefreshableRequest(path: string, options: ApiRequestOptions): boolean {
+  if (!options.accessToken) {
+    return false;
+  }
+
+  const endpoint = path.replace(/^\/+|\/+$/g, "");
+  return ![
+    "auth/login",
+    "auth/register",
+    "auth/refresh",
+  ].includes(endpoint);
+}
+
+function authenticationError(): ApiError {
+  return new ApiError(
+    401,
+    "UNAUTHORIZED",
+    "Your session has expired. Please sign in again.",
+  );
+}
+
+function abortError(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+async function refreshAccessTokenSingleFlight(): Promise<string> {
+  if (!refreshInFlight) {
+    const attempt = (async () => {
+      try {
+        const refreshToken = authHandlers?.getSessionTokens().refreshToken;
+
+        if (!refreshToken) {
+          throw authenticationError();
+        }
+
+        const result = await requestOnce<{ accessToken: string }>(
+          "/auth/refresh",
+          {
+            method: "POST",
+            body: { refreshToken },
+          },
+        );
+
+        if (!result.accessToken) {
+          throw authenticationError();
+        }
+
+        authHandlers?.updateAccessToken(result.accessToken);
+        return result.accessToken;
+      } catch {
+        authHandlers?.clearSession();
+        throw authenticationError();
+      }
+    })();
+
+    refreshInFlight = attempt;
+  }
+
+  const activeAttempt = refreshInFlight;
+
+  try {
+    return await activeAttempt;
+  } finally {
+    if (refreshInFlight === activeAttempt) {
+      refreshInFlight = undefined;
+    }
+  }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<T> {
+  try {
+    return await requestOnce<T>(path, options);
+  } catch (error) {
+    if (
+      !(error instanceof ApiError) ||
+      error.status !== 401 ||
+      !isRefreshableRequest(path, options)
+    ) {
+      throw error;
+    }
+
+    if (options.signal?.aborted) {
+      throw abortError();
+    }
+
+    const currentAccessToken = authHandlers?.getSessionTokens().accessToken;
+    let accessToken: string;
+
+    if (currentAccessToken && currentAccessToken !== options.accessToken) {
+      accessToken = currentAccessToken;
+    } else {
+      accessToken = await refreshAccessTokenSingleFlight();
+    }
+
+    if (options.signal?.aborted) {
+      throw abortError();
+    }
+
+    return requestOnce<T>(path, { ...options, accessToken });
+  }
 }
