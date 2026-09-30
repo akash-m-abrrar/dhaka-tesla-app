@@ -18,10 +18,10 @@ export function useZonesQuery() {
   return useQuery(zonesQueryOptions());
 }
 
-export function usePassengerRideRequestsQuery() {
+export function usePassengerRideRequestsQuery(enabled = true) {
   const accessToken = useAppSelector((state) => state.auth.accessToken);
 
-  return useQuery(passengerRideRequestsQueryOptions(accessToken));
+  return useQuery(passengerRideRequestsQueryOptions(accessToken, enabled));
 }
 
 export function useRideRequestQuery(id: string) {

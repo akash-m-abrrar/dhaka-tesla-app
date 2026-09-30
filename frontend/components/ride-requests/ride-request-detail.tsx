@@ -4,9 +4,10 @@ import Link from "next/link";
 import { ArrowLeft, LoaderCircle, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useCancelRideRequestMutation, useRideRequestQuery, useZonesQuery } from "@/lib/features/ride-requests/hooks";
+import { useCancelRideRequestMutation, usePassengerRideRequestsQuery, useRideRequestQuery, useZonesQuery } from "@/lib/features/ride-requests/hooks";
 import { formatFare } from "@/lib/features/ride-requests/format";
 import { getRideRequestErrorMessage } from "@/lib/features/ride-requests/errors";
+import { PassengerPaymentPanel } from "@/components/payments/passenger-payment-panel";
 
 const createdAtFormatter = new Intl.DateTimeFormat("en-BD", {
   dateStyle: "medium",
@@ -17,8 +18,11 @@ const cancellableStatuses = new Set(["PENDING", "MATCHED", "ACCEPTED"]);
 
 export function RideRequestDetail({ id }: { id: string }) {
   const requestQuery = useRideRequestQuery(id);
+  const hasPoolMembership = requestQuery.data?.status === "ACCEPTED" || requestQuery.data?.status === "MATCHED";
+  const historyQuery = usePassengerRideRequestsQuery(Boolean(hasPoolMembership));
   const zonesQuery = useZonesQuery();
   const cancelMutation = useCancelRideRequestMutation(id);
+  const historyRequest = historyQuery.data?.find((item) => item.id === id);
 
   if (requestQuery.isPending) {
     return (
@@ -108,6 +112,32 @@ export function RideRequestDetail({ id }: { id: string }) {
           <dd className="mt-1 break-all font-mono text-xs">{request.id}</dd>
         </div>
       </dl>
+
+      {historyQuery.isError && hasPoolMembership && (
+        <div className="mt-6" role="alert">
+          <p className="text-sm text-destructive">We couldn’t load this trip’s payment status.</p>
+          <Button className="mt-3" onClick={() => void historyQuery.refetch()} type="button" variant="outline"><RotateCw aria-hidden="true" />Try again</Button>
+        </div>
+      )}
+
+      {historyQuery.isPending && hasPoolMembership && (
+        <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground" role="status"><LoaderCircle aria-hidden="true" className="size-4 animate-spin" />Loading trip and payment details…</p>
+      )}
+
+      {historyRequest?.poolMember && (
+        <PassengerPaymentPanel
+          fare={historyRequest.poolMember.fare}
+          memberStatus={historyRequest.poolMember.status}
+          poolMemberId={historyRequest.poolMember.id}
+          poolStatus={historyRequest.poolMember.pool.status}
+        />
+      )}
+
+      {historyRequest?.poolMember && historyRequest.poolMember.pool.status !== "COMPLETED" && (
+        <Button className="mt-5" onClick={() => void historyQuery.refetch()} type="button" variant="outline">
+          <RotateCw aria-hidden="true" />Refresh trip status
+        </Button>
+      )}
 
       {cancelMutation.isSuccess && (
         <p className="mt-6 rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm" role="status">
